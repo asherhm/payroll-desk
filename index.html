@@ -199,7 +199,7 @@ const store={get(k,d){try{const v=localStorage.getItem("wpd."+k);return v==null?
   set(k,v){try{localStorage.setItem("wpd."+k,JSON.stringify(v))}catch{}}};
 
 /* ---------- assumptions (editable in Settings) ---------- */
-const DEFAULT_ASSUME={horizonDays:14,toolTiers:[3,8,15,25,40,65],wageCardPct:5,moveHappy:10,moveDays:7,companyMoveHappy:10,coreBonus:5,maxSpec:20,mgmtCap:22,storageWarnHours:24,shieldPerResp:10,valueAt:"market",mgrRate:0.0101};
+const DEFAULT_ASSUME={horizonDays:14,toolTiers:[3,8,15,25,40,65],wageCardPct:5,moveHappy:10,moveDays:7,companyMoveHappy:10,coreBonus:5,maxSpec:20,mgmtCap:22,storageWarnHours:24,shieldPerResp:10,valueAt:"market",mgrRate:0.0101,hireDays:30,selfWorkBonus:true,regenPct:10};
 let A=Object.assign({},DEFAULT_ASSUME,store.get("assume",{}));
 const TOOLBOX_ODDS=[.35,.37,.20,.065,.013,.002];
 const expToolPct=()=>TOOLBOX_ODDS.reduce((s,p,i)=>s+p*A.toolTiers[i],0);
@@ -244,7 +244,7 @@ async function apiVoid(proc){const res=await fetch(API+proc,{headers:apiHeaders(
 /* ---------- state ---------- */
 let S=null;          // loaded dataset
 let tab="advice";
-let sub=store.get("sub","fire");   // Recommendations sub-view
+let sub=store.get("sub","energy");   // Recommendations sub-view
 let selCo=store.get("selco",null); // company shown in Companies
 let mgrEdit=null, mgrConfirm=null;   // manager strip state
 let apiStatus=null;  // null | "ok" | "blocked" | message
@@ -252,7 +252,7 @@ let apiStatus=null;  // null | "ok" | "blocked" | message
 /* ---------- example dataset (shown until a real lookup succeeds) ---------- */
 function exampleData(){
   return {example:true,
-    player:{id:"ex",username:"Example Player",country:"c-ie",mgmt:6},
+    player:{id:"ex",username:"Example Player",country:"c-ie",mgmt:6,leadership:3,ppPerWork:60,energy:{max:200,cur:80}},energyCost:10,
     ppValue:0.05,
     prices:{iron:.05,steel:1.12,grain:.048,bread:1.08,limestone:.05,concrete:1.02},
     items:{iron:{pp:1,needs:{}},steel:{pp:10,needs:{iron:10}},grain:{pp:1,needs:{}},bread:{pp:10,needs:{grain:10}},limestone:{pp:1,needs:{}},concrete:{pp:10,needs:{limestone:10}}},
@@ -319,7 +319,11 @@ async function lookup(username){
       imported+=fromApi.length;
       employees[c.id]=fromApi.length?mergeEmps(saved,fromApi):saved;
     });
-    S={example:false,player:{id:u._id,username:u.username,country:u.country,mgmt:store.get("mgmt."+u._id,mgmt)},
+    const en=u.skills?.energy||{},pr=u.skills?.production||{};
+    const ov=store.get("stats."+u._id,{});
+    S={example:false,energyCost:cfg.user?.energyCostPerAction??10,
+      player:{id:u._id,username:u.username,country:u.country,mgmt:store.get("mgmt."+u._id,mgmt),leadership:skillLevel(u.skills?.leadership),
+        ppPerWork:ov.ppPerWork??(pr.value??pr.total??0),energy:{max:ov.eMax??(en.total??en.value??0),cur:en.currentBarValue??0}},
       ppValue:ppValue??0,prices:priceR.ok?priceR.data:{},items,countries,regions,breakRoomCaps:caps,engineDaily,storageMax,companies,employees,imported,
       apiDebug:{checkedAt:new Date().toISOString(),workersEndpoint:workR.ok?"answered":("error: "+workR.error),
         companiesWithWorkerData:companies.filter(c=>(apiByCompany[c.id]?.length||c.rawWorkers?.length)).length,imported,sample:rawSample,
@@ -494,6 +498,68 @@ async function findManager(cid){
 }
 function saveMgr(c){if(S.example)return;store.set("mgr."+c.id,c.managerMgmt||0);store.set("mgrname."+c.id,c.managerName||"");store.set("mgrpay."+c.id,isNum(c.managerPay)?+c.managerPay:null)}
 
+/* ---------- energy ----------
+   Each action costs energyCost (10): self-work makes PP equal to your Production skill;
+   hiring fills a free Break Room slot; training draws one card for one employee (once a day each). */
+const NEW_HIRE={prod:2.5,luck:2.5,resp:2.5,age:31.5,pot:6.5}; // average starting rolls from the patch notes
+function selfWorkOptions(){
+  const ppw=S.player.ppPerWork||0;
+  return S.companies.map(c=>{
+    const k=evalCompany(c);
+    const bonus=A.selfWorkBonus?P(Math.min(A.mgmtCap,2*S.player.mgmt)):0; // confirmed: 60 PP → 66 at Management 5
+    const pp=ppw*(1+bonus);
+    const room=k.max?Math.max(0,k.max-k.stored-k.ppDay):Infinity; // space left after a day of normal production
+    return {c,pp,value:pp*k.value,room};
+  }).sort((a,b)=>b.value-a.value);
+}
+function recEnergy(){
+  const cost=S.energyCost||10, E=Object.assign({max:0,cur:0},S.player.energy);E.regen=E.max*P(A.regenPct); // energy regenerates 10% of max per hour
+  const perDay=Math.floor((E.regen||0)*24/cost);
+  const sw=selfWorkOptions().filter(o=>o.room>=o.pp);
+  const self=sw[0]||null, selfV=self?self.value:0;
+  const uses=[];
+  // hires: one per free slot, valued over the new employee's expected working life
+  S.companies.forEach(c=>{
+    const n=(S.employees[c.id]||[]).length, free=cap(c)-n;if(free<=0)return;
+    const h=Object.assign(emp("New hire",NEW_HIRE.prod,NEW_HIRE.luck,NEW_HIRE.resp,50+hDelta({resp:NEW_HIRE.resp,traits:[]},-taxAt(c.region)),NEW_HIRE.age,NEW_HIRE.pot,0,[],0,0),{exp:100});
+    const r=evalEmp(h,c,{coworkers:n});const days=Math.min(65-NEW_HIRE.age,A.hireDays);
+    const v=r.net*24*days;
+    uses.push({kind:"hire",c,v,free,perDay:r.net*24,days});
+  });
+  // training: one draw per employee per day, valued over the days they have left
+  recTraining().forEach(t=>{
+    const best=(t.opts||[]).find(o=>!o.ref&&o.v!=null&&o.v>0);if(!best)return;
+    const days=Math.min(daysLeft(t.who),A.hireDays);
+    uses.push({kind:"train",c:t.c,e:t.who,v:best.v*days,card:best.k,perDay:best.v,days});
+  });
+  uses.sort((a,b)=>b.v-a.v);
+  const beat=uses.filter(u=>u.v>selfV);
+  const recs=[];
+  // daily plan
+  const firstActions=beat.reduce((s,u)=>s+(u.kind==="hire"?u.free:1),0);
+  const left=Math.max(0,perDay-firstActions);
+  const plan=[];
+  if(beat.length)plan.push(`Spend the first ${firstActions*cost} energy on ${beat.length} hire${beat.some(u=>u.kind==="train")?" or training":""} action${firstActions===1?"":"s"} listed below.`);
+  // fill self-work into companies in value order, up to each one's free storage
+  let rest=left;const split=[];let total=0;
+  for(const o of sw){if(!rest)break;const n=o.room===Infinity?rest:Math.min(rest,Math.floor(o.room/o.pp));if(n>0){split.push(`${n} at ${o.c.name}`);total+=n*o.value;rest-=n}}
+  if(split.length)plan.push(`Put ${(left-rest)*cost} energy into self-work: ${split.join(", ")}, worth about ${fmt(total)}.`);
+  if(rest>0&&sw.length)plan.push(`That fills your storage; produce goods to make room for the last ${rest} work${rest===1?"":"s"}.`);
+  if(!self)plan.push("No company has storage room for self-work today; produce first.");
+  recs.push({lvl:"good",chip:`${perDay} actions/day`,title:"Today's energy plan",
+    body:`You regenerate ${fmt(E.regen)} energy an hour (${perDay} actions of ${cost} a day, max ${E.max}). ${plan.join(" ")}`});
+  if(self)recs.push({lvl:"info",chip:"Baseline",title:`Self-work at ${self.c.name}`,
+    body:`${fmt(self.pp)} PP of ${itemName(self.c.itemCode)} per ${cost} energy, worth ${fmt(self.value)}. Anything below this value is better spent on self-work.${sw[1]?` Next best: ${sw[1].c.name} at ${fmt(sw[1].value)}.`:""}`});
+  uses.forEach(u=>{
+    const better=u.v>selfV;
+    if(u.kind==="hire")recs.push({lvl:better?"good":"info",chip:better?"Hire":"Self-work instead",c:u.c,title:`Hire into ${u.c.name} (${u.free} free slot${u.free>1?"s":""})`,
+      body:`An average new hire nets about ${signed(u.perDay)}/day, ${fmt(u.v)} over ${Math.round(u.days)} days, against ${fmt(selfV)} for one self-work. ${better?"Pick the candidate whose hint shows high Production or Potential.":"Not worth the energy at today's prices."}`});
+    else recs.push({lvl:better?"good":"info",chip:better?"Train":"Self-work instead",c:u.c,who:u.e,title:`Train ${u.e.name}`,
+      body:`Best card ${u.card} adds ${signed(u.perDay)}/day, ${fmt(u.v)} over ${Math.round(u.days)} days, against ${fmt(selfV)} for one self-work.`});
+  });
+  return recs;
+}
+
 /* ---------- recommendations ---------- */
 function recStorage(){
   const recs=[];
@@ -652,7 +718,7 @@ function playerBlock(){
   const net=S.companies.reduce((s,c)=>s+evalCompany(c).profitDay,0);
   const co=S.countries[S.player.country];
   return `<section class="player"><div class="who"><div><div class="label">Player</div><h2>${esc(S.player.username)}</h2></div>
-  <div class="small muted">${esc(co?.name||"")}${co?` · ${co.tax}% income tax`:""} · Management ${S.player.mgmt}</div></div>
+  <div class="small muted">${esc(co?.name||"")}${co?` · ${co.tax}% income tax`:""} · Management ${S.player.mgmt} · Production ${S.player.ppPerWork||"–"} · Energy ${S.player.energy?.max||"–"}</div></div>
   <div class="stats"><div><div class="label">Profit / day</div><div class="v ${net>=0?"pos":"neg"}">${fmt(net)}</div></div>
   <div><div class="label">Employees</div><div class="v">${allEmps().length}</div></div>
   <div><div class="label">PP value</div><div class="v">${S.ppValue?S.ppValue.toFixed(4):"–"}</div></div></div></section>`;
@@ -666,17 +732,17 @@ function section(title,recs,emptyMsg,foot=""){
   return `<section class="block"><div class="block-head"><h2>${title}</h2><span class="count">${recs.length}</span></div>
   <div class="list">${recs.length?recs.map(recHTML).join(""):`<div class="empty">${emptyMsg}</div>`}</div>${foot}</section>`;
 }
-const SUBS=[["fire","Fire or fix"],["relocate","Relocate"],["training","Training"],["location","Location"],["manager","Manager"],["storage","Storage"]];
+const SUBS=[["energy","Energy"],["fire","Fire or fix"],["relocate","Relocate"],["training","Training"],["location","Location"],["manager","Manager"],["storage","Storage"]];
 function adviceView(){
   const n=allEmps().length;
-  const lists={fire:n?recFire():[],relocate:n?recRelocate():[],training:n?recTraining():[],location:recCompanyMove(),manager:n?recManager():[],storage:recStorage()};
-  const flag=k=>k==="training"?0:k==="manager"?lists[k].filter(r=>r.lvl==="bad"||r.chip==="Hire").length:lists[k].filter(r=>r.lvl!=="info").length;
+  const lists={energy:recEnergy(),fire:n?recFire():[],relocate:n?recRelocate():[],training:n?recTraining():[],location:recCompanyMove(),manager:n?recManager():[],storage:recStorage()};
+  const flag=k=>k==="training"||k==="energy"?0:k==="manager"?lists[k].filter(r=>r.lvl==="bad"||r.chip==="Hire").length:lists[k].filter(r=>r.lvl!=="info").length;
   if(!SUBS.some(([k])=>k===sub))sub="fire";
   const h=`<div class="seg" role="tablist" aria-label="Recommendation type">${SUBS.map(([k,l])=>`<button type="button" role="tab" data-sub="${k}" aria-selected="${k===sub}">${l}${flag(k)?`<span class="n">${flag(k)}</span>`:""}</button>`).join("")}</div>`;
   if(!n&&["fire","relocate","training","manager"].includes(sub))return h+`<div class="empty">No employees entered yet. The API doesn't share employee stats yet, so add them from the game in the Companies tab.<br><br><button class="btn primary" data-goto="companies">Add employees</button></div>`;
-  const T={fire:["Fire or fix","Every employee earns more than their wage."],relocate:["Relocate workers","No move beats where everyone works now."],
+  const T={energy:["Energy","No energy data. Add your Energy and Production in Settings."],fire:["Fire or fix","Every employee earns more than their wage."],relocate:["Relocate workers","No move beats where everyone works now."],
     training:["Training priorities","No employees to train."],location:["Company location","No companies found."],manager:["Managers","No companies with employees."],storage:["Storage",`No storage fills within ${A.storageWarnHours} hours.`]};
-  const foot=sub==="manager"?`<p class="small muted">Pay is per Management point per hour; the manager tax comes out of what they receive. Care value assumes the manager cares daily, holding +10 happiness on one employee.</p>`:sub==="training"?`<p class="small muted">Values are net money per day for one point. Wage rises with Production. *Lower wage cards cut ${A.wageCardPct}% at Common and ${A.wageCardPct}% more per rarity step (Uncommon ${A.wageCardPct*2}%, Rare ${A.wageCardPct*3}%, Epic ${A.wageCardPct*4}%, Legendary ${A.wageCardPct*5}%, Mythic ${A.wageCardPct*6}%), so scale the Common figure when you draw a rarer one.</p>`:"";
+  const foot=sub==="energy"?`<p class="small muted">Every action costs ${S.energyCost||10} energy. Hires use an average new employee (stats 2.5, wage at market rate); training uses each employee's best card. Both are valued over ${A.hireDays} days, or until the employee retires if sooner.</p>`:sub==="manager"?`<p class="small muted">Pay is per Management point per hour; the manager tax comes out of what they receive. Care value assumes the manager cares daily, holding +10 happiness on one employee.</p>`:sub==="training"?`<p class="small muted">Values are net money per day for one point. Wage rises with Production. *Lower wage cards cut ${A.wageCardPct}% at Common and ${A.wageCardPct}% more per rarity step (Uncommon ${A.wageCardPct*2}%, Rare ${A.wageCardPct*3}%, Epic ${A.wageCardPct*4}%, Legendary ${A.wageCardPct*5}%, Mythic ${A.wageCardPct*6}%), so scale the Common figure when you draw a rarer one.</p>`:"";
   return h+section(T[sub][0],lists[sub],T[sub][1],foot);
 }
 const tag=(e,f)=>e.from?.includes(f)?`<span class="src">game</span>`:"";
@@ -747,7 +813,13 @@ function settingsView(){
   <div class="segset" role="group" aria-label="Value output at"><button type="button" data-valueat="market" aria-pressed="${A.valueAt!=="pp"}">Market price</button><button type="button" data-valueat="pp" aria-pressed="${A.valueAt==="pp"}">Game's PP rate</button></div>
   <p class="small muted">Market price is what your goods actually sell for, net of inputs. The game's own profit figures value every good at the PP rate (${S.ppValue?S.ppValue.toFixed(4):"–"}), so pick that to match the employee screen.</p></section>
   <section class="block"><div class="block-head"><h2>Your stats</h2></div>
-  <div class="field"><label class="label" for="mgmt">Management points (owner)</label><input id="mgmt" type="number" min="0" max="20" value="${S.player.mgmt}"></div></section>
+  <div class="field"><label class="label" for="mgmt">Management points (owner)</label><input id="mgmt" type="number" min="0" max="20" value="${S.player.mgmt}"></div>
+  <div class="grid2"><div class="field"><label class="label" for="ppw">PP per self-work</label><input id="ppw" type="number" min="0" value="${S.player.ppPerWork||0}"></div>
+  <div class="field"><label class="label" for="emax">Energy max</label><input id="emax" type="number" min="0" value="${S.player.energy?.max||0}"></div>
+  <div class="field"><span class="label">Energy per hour</span><span class="mono">${fmt((S.player.energy?.max||0)*P(A.regenPct))} (${A.regenPct}% of max)</span></div>
+  <div class="field"><span class="label">Leadership</span><span class="mono">${S.player.leadership||0}</span></div></div>
+  <p class="small muted">These come from the API on lookup. Change them if they look wrong; changes are kept for this player.</p>
+  <label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="swbonus" ${A.selfWorkBonus?"checked":""}>Self-work gets my Management bonus (60 PP became 66 at Management 5)</label></section>
   <section class="block"><div class="block-head"><h2>Employee data from the API</h2></div>
   ${d?`<p class="small">Workers endpoint: <b>${esc(d.workersEndpoint)}</b>. Companies with employee records: <b>${d.companiesWithWorkerData}</b>. Employees understood: <b>${d.imported}</b>.</p>
   <p class="small muted">When War Era adds employee details to the API, they'll appear here. If employees show up below but not in your companies, copy this and send it to whoever maintains the tool so the field names can be mapped.</p>
@@ -760,7 +832,7 @@ function settingsView(){
    ${num("horizonDays","Payback window (days)",A.horizonDays)}${num("wageCardPct","Lower-wage cut at Common %",A.wageCardPct)}
    ${num("moveHappy","Move happiness hit",A.moveHappy)}${num("moveDays","Move hit lasts (days)",A.moveDays)}
    ${num("companyMoveHappy","Company move happiness hit",A.companyMoveHappy)}${num("coreBonus","Core region bonus %",A.coreBonus)}
-   ${num("mgrRate","Manager pay to compare (per point/h)",A.mgrRate)}${num("maxSpec","Specialization cap %",A.maxSpec)}${num("shieldPerResp","Loss shielded per Responsibility %",A.shieldPerResp)}${num("storageWarnHours","Warn when storage fills within (h)",A.storageWarnHours)}</div>
+   ${num("mgrRate","Manager pay to compare (per point/h)",A.mgrRate)}${num("hireDays","Value hires and training over (days)",A.hireDays)}${num("maxSpec","Specialization cap %",A.maxSpec)}${num("shieldPerResp","Loss shielded per Responsibility %",A.shieldPerResp)}${num("storageWarnHours","Warn when storage fills within (h)",A.storageWarnHours)}</div>
   <div class="field"><label class="label" for="toolTiers">Tool bonus % by rarity (Common → Mythic)</label><input id="toolTiers" value="${A.toolTiers.join(", ")}"></div>
   <div class="actions"><button class="btn primary" data-saveassume>Save assumptions</button><button class="btn ghost" data-resetassume>Reset</button></div>
   <details><summary>How the numbers are worked out</summary><div class="formula">PP/hr      = Production ÷ 4 × (1 + bonus %)
@@ -859,6 +931,9 @@ app.addEventListener("click",e=>{
     document.querySelectorAll("[data-as]").forEach(i=>A[i.dataset.as]=+i.value);
     const tt=document.getElementById("toolTiers").value.split(/[,\s]+/).map(Number).filter(n=>!isNaN(n));if(tt.length===6)A.toolTiers=tt;
     const m=+document.getElementById("mgmt").value;if(!isNaN(m)){S.player.mgmt=m;if(!S.example)store.set("mgmt."+S.player.id,m)}
+    const ppw=+document.getElementById("ppw").value,emax=+document.getElementById("emax").value;
+    S.player.ppPerWork=ppw;S.player.energy=Object.assign({},S.player.energy,{max:emax});A.selfWorkBonus=document.getElementById("swbonus").checked;
+    if(!S.example)store.set("stats."+S.player.id,{ppPerWork:ppw,eMax:emax});
     store.set("assume",A);render();return}
   if(t.closest("[data-resetassume]")){A=Object.assign({},DEFAULT_ASSUME);store.set("assume",{});render();return}
 });
