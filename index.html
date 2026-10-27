@@ -124,11 +124,20 @@ section.block{display:grid;gap:10px}
 .st{font-family:var(--f-mono);font-size:.86rem;background:var(--bg);border-radius:5px;padding:1px 6px}
 .st.bonus{background:var(--warn-soft);color:var(--warn)}
 .st.care{background:var(--accent-soft);color:var(--good)}
-.mgrbox{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:8px}
-.mgrbox .find{display:grid;grid-template-columns:1fr auto;gap:6px}
-.mgrbox input{width:100%;min-width:0;font-size:16px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
-.mgrbox .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.mgrbox label{display:grid;gap:3px;font-size:.84rem;color:var(--muted)}
+.mstrip{padding:10px 12px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+.mstrip.on{background:var(--accent-soft);box-shadow:inset 4px 0 0 var(--accent)}
+.mstrip.edit{background:var(--bg)}
+.mstrip .mrow{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.mstrip .mname{font-weight:600;display:inline-flex;gap:8px;align-items:baseline;min-width:0}
+.mstrip .mlabel{font-size:.76rem;text-transform:uppercase;letter-spacing:.08em;font-weight:600;color:var(--good)}
+.mstrip .l2{display:flex;flex-wrap:wrap;gap:4px}
+.mstrip.on .st{background:var(--surface)}
+.mstrip .find{display:grid;grid-template-columns:1fr auto;gap:6px}
+.mstrip input{width:100%;min-width:0;font-size:16px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.mstrip .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mstrip label{display:grid;gap:3px;font-size:.84rem;color:var(--muted)}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+.facts .mtag{color:var(--good);font-weight:500}
 .tr{font-size:.8rem;font-weight:600;border-radius:99px;padding:1px 8px;background:var(--accent-soft);color:var(--good)}
 .tr.neg{background:var(--bad-soft);color:var(--bad)}
 .store{padding:10px 12px;display:grid;gap:6px;border-bottom:1px solid var(--line)}
@@ -237,6 +246,7 @@ let S=null;          // loaded dataset
 let tab="advice";
 let sub=store.get("sub","fire");   // Recommendations sub-view
 let selCo=store.get("selco",null); // company shown in Companies
+let mgrEdit=null, mgrConfirm=null;   // manager strip state
 let apiStatus=null;  // null | "ok" | "blocked" | message
 
 /* ---------- example dataset (shown until a real lookup succeeds) ---------- */
@@ -475,9 +485,11 @@ async function findPlayer(q){
 function skillLevel(sk){return typeof sk==="object"?(sk.level??sk.value??0):(+sk||0)}
 async function findManager(cid){
   const c=company(cid),inp=document.getElementById("mgrname-"+cid),msg=document.getElementById("mgrmsg-"+cid);
-  const q=inp.value.trim();if(!q){c.managerName="";saveMgr(c);render();return}
+  const q=inp.value.trim();if(!q){msg.textContent="Type their username first.";return}
   msg.textContent="Looking up…";
-  try{const u=await findPlayer(q);c.managerName=u.username||q;c.managerMgmt=Math.min(20,skillLevel(u.skills?.management));saveMgr(c);render()}
+  try{const u=await findPlayer(q);const lv=Math.min(20,skillLevel(u.skills?.management));
+    inp.value=u.username||q;document.getElementById("mgr-"+cid).value=lv;
+    msg.textContent=`Found ${u.username||q}: Management ${lv}. Check the pay, then Save.`}
   catch(e){msg.textContent=e instanceof TypeError?"Can't reach the War Era API from here. Enter their Management level instead.":e.message}
 }
 function saveMgr(c){if(S.example)return;store.set("mgr."+c.id,c.managerMgmt||0);store.set("mgrname."+c.id,c.managerName||"");store.set("mgrpay."+c.id,isNum(c.managerPay)?+c.managerPay:null)}
@@ -680,6 +692,22 @@ function companiesView(){
     <button type="button" class="btn sm" data-conav="1" aria-label="Next company" ${i===S.companies.length-1?"disabled":""}>›</button></div>`
     +companyCard(c)+`<p class="small muted">Company ${i+1} of ${S.companies.length}. Employee details you type are saved in this browser only.</p>`;
 }
+// Manager strip: sits between the company header and employees, like the game.
+function mgrStrip(c){
+  const on=(c.managerMgmt||0)>0, editing=mgrEdit===c.id, confirming=mgrConfirm===c.id;
+  const rate=isNum(c.managerPay)?+c.managerPay:A.mgrRate, bonus=Math.min(A.mgmtCap,2*(c.managerMgmt||0));
+  if(editing)return `<div class="mstrip edit"><div class="mrow"><span class="mlabel">${on?"Edit manager":"Add manager"}</span></div>
+    <div class="find"><input id="mgrname-${c.id}" placeholder="Manager's username" value="${esc(c.managerName||"")}" autocomplete="off" autocapitalize="off" aria-label="Manager's username"><button type="button" class="btn sm" data-mgrfind="${c.id}">Find</button></div>
+    <div class="two"><label for="mgr-${c.id}">Management<input id="mgr-${c.id}" type="number" inputmode="numeric" min="1" max="20" value="${c.managerMgmt||""}" placeholder="e.g. 5"></label>
+    <label for="mgrpay-${c.id}">Pay per point / h<input id="mgrpay-${c.id}" type="number" inputmode="decimal" step="any" min="0" value="${isNum(c.managerPay)?c.managerPay:""}" placeholder="${A.mgrRate}"></label></div>
+    <span class="hint" id="mgrmsg-${c.id}" aria-live="polite">Find fills in their Management from the API. Leave pay blank to use the market rate (${A.mgrRate}).</span>
+    <div class="actions"><span></span><span style="display:flex;gap:8px"><button type="button" class="btn sm" data-mgrcancel>Cancel</button><button type="button" class="btn sm primary" data-mgrsave="${c.id}">Save manager</button></span></div></div>`;
+  if(!on)return `<div class="mstrip none"><div class="mrow"><span class="muted">No manager</span><button type="button" class="btn sm" data-mgradd="${c.id}">Add manager</button></div></div>`;
+  return `<div class="mstrip on"><div class="mrow"><span class="mname">${esc(c.managerName||"Unnamed manager")}<span class="mlabel">Manager</span></span><span class="mono">${(rate*c.managerMgmt).toFixed(4)}/h</span></div>
+    <div class="mrow"><span class="l2"><span class="st">Mgmt ${c.managerMgmt}</span><span class="st bonus">+${bonus}% production</span><span class="st">${rate} per point/h${isNum(c.managerPay)?"":" (market)"}</span></span></div>
+    ${confirming?`<div class="mrow"><span class="small">Remove ${esc(c.managerName||"this manager")}?</span><span style="display:flex;gap:8px"><button type="button" class="btn sm" data-mgrno>Keep</button><button type="button" class="btn sm danger" data-mgryes="${c.id}">Remove</button></span></div>`
+      :`<div class="mrow"><span class="small muted">Applied to every employee here · −${fmt(rate*c.managerMgmt*24)}/day</span><span style="display:flex;gap:8px"><button type="button" class="btn sm" data-mgredit="${c.id}">Edit</button><button type="button" class="btn sm ghost" data-mgrremove="${c.id}">Remove</button></span></div>`}</div>`;
+}
 function companyCard(c){
   const emps=S.employees[c.id]||[];const r=S.regions[c.region];const cty=S.countries[r?.country];
   const k=evalCompany(c);const good=itemName(c.itemCode);
@@ -690,7 +718,8 @@ function companyCard(c){
   <div class="chead"><div class="tile" title="${esc(good)}">${esc(initials(good))}</div>
     <div class="hmain"><div class="row"><h3>${esc(c.name)}</h3><span class="mono" style="color:var(${k.profitDay>=0?"--good":"--bad"})">${signed(k.profitDay)}/day</span></div>
     <div class="small">${esc(r?.name||"Unknown region")}${cty?` · ${esc(cty.name)}`:""}${isCore(c.region)?` <span class="chip good">core</span>`:""}</div>
-    <div class="facts"><span>${taxAt(c.region)}% tax</span><span>Engine ${c.engine||0}</span><span>Break room ${c.breakRoom} · ${emps.length}/${cap(c)}</span><span>Storage ${c.storage}</span></div></div></div>
+    <div class="facts"><span>${taxAt(c.region)}% tax</span><span>Engine ${c.engine||0}</span><span>Break room ${c.breakRoom} · ${emps.length}/${cap(c)}</span><span>Storage ${c.storage}</span>${c.managerMgmt>0?`<span class="mtag">Manager +${Math.min(A.mgmtCap,2*c.managerMgmt)}%</span>`:""}</div></div></div>
+  ${mgrStrip(c)}
   ${emps.map((e,j)=>{const x=evalEmp(e,c);return `<button class="emp2" data-edit="${c.id}:${j}">
     <span class="l1"><span class="name">${esc(e.name)}${e.from?.length?`<span class="src">game</span>`:""}</span><span class="muted small">${e.age}</span><span class="net" style="color:var(${x.net>=0?"--good":"--bad"})">${signed(x.net*24)}</span></span>
     <span class="l2"><span class="st">P ${e.prod}</span><span class="st">R ${e.resp}</span><span class="st">L ${e.luck}</span><span class="st">☺ ${e.happy}</span><span class="st bonus">${x.pct>=0?"+":""}${x.pct.toFixed(1)}%</span>${e.care?`<span class="st care">Care ${e.care}</span>`:""}<span class="st">Pot ${e.pot}</span></span>
@@ -705,11 +734,6 @@ function companyCard(c){
     <div class="row"><span>Automated engine${c.engine?` lvl ${c.engine}`:""}</span><span class="mono">${c.engine?`${fmt(k.engPPday)} PP · +${fmt(k.engValueDay)}/day`:"none"}</span></div>
     ${k.mgrPayDay?`<div class="row"><span>Manager pay</span><span class="mono">−${fmt(k.mgrPayDay)}/day</span></div>`:""}
     <div class="row"><span>1 PP of ${esc(good)} (${A.valueAt==="pp"?"game rate":"market"})</span><span class="mono">${k.value.toFixed(4)}${A.valueAt!=="pp"&&k.value<S.ppValue?` <span class="chip warn">below wage rate</span>`:""}</span></div>
-    <div class="mgrbox"><div class="row"><span>Manager</span><span class="small muted">${c.managerMgmt?`${esc(c.managerName||"Unnamed")} · +${Math.min(A.mgmtCap,2*c.managerMgmt)}% production`:"None"}</span></div>
-      <div class="find"><input id="mgrname-${c.id}" placeholder="Manager's username" value="${esc(c.managerName||"")}" autocomplete="off" autocapitalize="off" aria-label="Manager's username"><button type="button" class="btn sm" data-mgrfind="${c.id}">Find</button></div>
-      <div class="two"><label for="mgr-${c.id}">Management<input id="mgr-${c.id}" data-mgr="${c.id}" type="number" inputmode="numeric" min="0" max="20" value="${c.managerMgmt||0}"></label>
-      <label for="mgrpay-${c.id}">Pay per point/h<input id="mgrpay-${c.id}" data-mgrpay="${c.id}" type="number" inputmode="decimal" step="any" min="0" value="${isNum(c.managerPay)?c.managerPay:""}" placeholder="${A.mgrRate}"></label></div>
-      <span class="hint" id="mgrmsg-${c.id}" aria-live="polite">Find reads their Management from the API. Set Management to 0 for no manager.</span></div>
     <button class="btn primary" data-add="${c.id}" ${emps.length>=cap(c)?"disabled":""}>${emps.length>=cap(c)?"Break room full":"Add employee"}</button>
   </div></article>`;
 }
@@ -812,8 +836,18 @@ app.addEventListener("click",e=>{
   const ad=t.closest("[data-add]");if(ad){openSheet(ad.dataset.add,null);return}
   const go=t.closest("[data-goto]");if(go){tab=go.dataset.goto;render();return}
   const mf=t.closest("[data-mgrfind]");if(mf){findManager(mf.dataset.mgrfind);return}
+  const ma=t.closest("[data-mgradd],[data-mgredit]");if(ma){mgrEdit=ma.dataset.mgradd||ma.dataset.mgredit;mgrConfirm=null;render();document.getElementById("mgrname-"+mgrEdit)?.focus({preventScroll:true});return}
+  if(t.closest("[data-mgrcancel]")){mgrEdit=null;render();return}
+  const ms=t.closest("[data-mgrsave]");if(ms){const c=company(ms.dataset.mgrsave),id=c.id;
+    const lv=Math.max(0,Math.min(20,+document.getElementById("mgr-"+id).value||0)),pay=document.getElementById("mgrpay-"+id).value.trim();
+    if(!lv){document.getElementById("mgrmsg-"+id).textContent="Enter their Management level (1 or more), or tap Find.";return}
+    c.managerName=document.getElementById("mgrname-"+id).value.trim();c.managerMgmt=lv;c.managerPay=pay===""?null:Math.max(0,+pay);
+    saveMgr(c);mgrEdit=null;render();return}
+  const mr=t.closest("[data-mgrremove]");if(mr){mgrConfirm=mr.dataset.mgrremove;render();return}
+  if(t.closest("[data-mgrno]")){mgrConfirm=null;render();return}
+  const my=t.closest("[data-mgryes]");if(my){const c=company(my.dataset.mgryes);c.managerMgmt=0;c.managerName="";c.managerPay=null;saveMgr(c);mgrConfirm=null;render();return}
   const sb=t.closest("[data-sub]");if(sb){sub=sb.dataset.sub;store.set("sub",sub);render();return}
-  const cn=t.closest("[data-conav]");if(cn){const i=S.companies.findIndex(c=>c.id===selCo)+(+cn.dataset.conav);if(S.companies[i]){selCo=S.companies[i].id;store.set("selco",selCo);render()}return}
+  const cn=t.closest("[data-conav]");if(cn){const i=S.companies.findIndex(c=>c.id===selCo)+(+cn.dataset.conav);if(S.companies[i]){selCo=S.companies[i].id;mgrEdit=mgrConfirm=null;store.set("selco",selCo);render()}return}
   const va=t.closest("[data-valueat]");if(va){A.valueAt=va.dataset.valueat;store.set("assume",A);render();return}
   if(t.closest("[data-savekey]")){store.set("key",document.getElementById("apikey").value.trim());render();return}
   if(t.closest("[data-clearkey]")){store.set("key","");render();return}
@@ -829,9 +863,7 @@ app.addEventListener("click",e=>{
   if(t.closest("[data-resetassume]")){A=Object.assign({},DEFAULT_ASSUME);store.set("assume",{});render();return}
 });
 app.addEventListener("change",e=>{
-  const m=e.target.closest("[data-mgr]");if(m){const c=company(m.dataset.mgr);c.managerMgmt=Math.max(0,+m.value||0);saveMgr(c);render()}
-  const mp=e.target.closest("[data-mgrpay]");if(mp){const c=company(mp.dataset.mgrpay);c.managerPay=mp.value.trim()===""?null:+mp.value;saveMgr(c);render()}
-  if(e.target.id==="cosel"){selCo=e.target.value;store.set("selco",selCo);render();return}
+  if(e.target.id==="cosel"){selCo=e.target.value;mgrEdit=mgrConfirm=null;store.set("selco",selCo);render();return}
   if(e.target.id==="mgmt"){const v=+e.target.value;if(!isNaN(v)){S.player.mgmt=v;if(!S.example)store.set("mgmt."+S.player.id,v)}}
 });
 
