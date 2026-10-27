@@ -35,6 +35,7 @@ h3{font-size:1.1rem}
 .label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
@@ -81,14 +82,19 @@ section.block{display:grid;gap:10px}
 
 .company{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .company .head{padding:10px 12px;display:grid;gap:4px;border-bottom:1px solid var(--line)}
-.company .head .row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.company .head .row,.company .ops .row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.company .ops{padding:8px 12px;display:grid;gap:6px;border-bottom:1px solid var(--line);font-size:.85rem}
 .good-tag{font-family:var(--f-mono);font-size:.78rem;background:var(--bg);border-radius:4px;padding:1px 6px}
+.meter{height:6px;background:var(--bg);border-radius:99px;overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--accent)}
+.meter.warn>i{background:var(--warn)} .meter.bad>i{background:var(--bad)}
 .emp{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 12px;border-bottom:1px solid var(--line);background:transparent;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
 .emp:last-child{border-bottom:0}
 .emp .name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .emp .meta{grid-column:1/-1;font-size:.8rem;color:var(--muted)}
 .emp .net{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
-.company .foot{padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.company .foot{padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.src{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--good);border:1px solid var(--accent-soft);border-radius:4px;padding:0 4px;margin-left:4px;vertical-align:1px}
 
 .sheet-bg{position:fixed;inset:0;background:rgba(10,16,12,.45);z-index:20}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--surface);border-radius:16px 16px 0 0;max-height:88vh;overflow:auto;
@@ -97,16 +103,23 @@ section.block{display:grid;gap:10px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .field{display:grid;gap:4px;min-width:0}
 .field input,.field select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.field input:disabled{opacity:.7}
+.hint{font-size:.75rem;color:var(--muted);line-height:1.3}
 .stepper{display:grid;grid-template-columns:36px 1fr 36px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
 .stepper button{border:0;background:transparent;font-size:1.1rem}
-.stepper input{border:0;border-radius:0;text-align:center;font-family:var(--f-mono);padding:8px 0;background:transparent}
+.field .stepper input{border:0;border-radius:0;text-align:center;font-family:var(--f-mono);padding:8px 0;background:transparent}
 .traits{display:flex;flex-wrap:wrap;gap:6px}
-.traits label{display:flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:99px;padding:4px 10px;font-size:.85rem}
-.traits input{margin:0}
+.traits label{position:relative;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:.85rem;background:var(--bg);cursor:pointer;user-select:none}
+.traits label::before{content:"+";font-family:var(--f-mono);opacity:.55}
+.field .traits input{position:absolute;opacity:0;width:1px;height:1px;margin:0;padding:0;border:0}
+.traits label:has(input:checked){background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.traits label:has(input:checked)::before{content:"✓";opacity:1}
+.traits label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 .actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
 details{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
 summary{font-weight:600;cursor:pointer}
-.formula{font-family:var(--f-mono);font-size:.8rem;background:var(--bg);border-radius:6px;padding:8px;overflow-x:auto;white-space:pre}
+.formula{font-family:var(--f-mono);font-size:.8rem;background:var(--bg);border-radius:6px;padding:8px;overflow-x:auto;white-space:pre;margin:8px 0}
+pre.raw{font-family:var(--f-mono);font-size:.72rem;background:var(--bg);border-radius:6px;padding:8px;overflow:auto;max-height:260px;margin:0;white-space:pre}
 .empty{border:1px dashed var(--line);border-radius:var(--r);padding:14px;text-align:center;color:var(--muted);font-size:.9rem}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 </style>
@@ -131,16 +144,19 @@ const store={get(k,d){try{const v=localStorage.getItem("wpd."+k);return v==null?
   set(k,v){try{localStorage.setItem("wpd."+k,JSON.stringify(v))}catch{}}};
 
 /* ---------- assumptions (editable in Settings) ---------- */
-const DEFAULT_ASSUME={horizonDays:14,toolTiers:[3,8,15,25,40,65],wageCardPct:5,moveHappy:10,moveDays:7,companyMoveHappy:10,coreBonus:5,maxDaysBonus:20,mgmtCap:22};
+const DEFAULT_ASSUME={horizonDays:14,toolTiers:[3,8,15,25,40,65],wageCardPct:5,moveHappy:10,moveDays:7,companyMoveHappy:10,coreBonus:5,maxSpec:20,mgmtCap:22,storageWarnHours:24,shieldPerResp:10};
 let A=Object.assign({},DEFAULT_ASSUME,store.get("assume",{}));
 const TOOLBOX_ODDS=[.35,.37,.20,.065,.013,.002];
 const expToolPct=()=>TOOLBOX_ODDS.reduce((s,p,i)=>s+p*A.toolTiers[i],0);
+// Traits the advice models. The game has 53; add more here as their effects are confirmed.
 const TRAITS=[
-  {id:"loner",label:"Loner",note:"+100% alone"},
+  {id:"loner",label:"Loner",note:"+100% when working alone"},
   {id:"sociable",label:"Sociable",note:"+25% per coworker"},
-  {id:"greedy",label:"Greedy",note:"+20% wage"},
-  {id:"modest",label:"Modest",note:"−15% wage"},
-  {id:"flight",label:"Flight risk",note:"quits below 50"},
+  {id:"greedy",label:"Greedy",note:"asks 20% more pay"},
+  {id:"modest",label:"Modest",note:"asks 15% less pay"},
+  {id:"latebloomer",label:"Late Bloomer",note:"+2 Production per 10 years past 40"},
+  {id:"luckycharm",label:"Lucky Charm",note:"coworkers get Luck 3"},
+  {id:"flight",label:"Flight risk",note:"starts looking to quit at 50 happiness"},
   {id:"anchor",label:"Anchor",note:"never quits"}];
 
 /* ---------- API ---------- */
@@ -167,7 +183,7 @@ async function apiVoid(proc){const res=await fetch(API+proc,{headers:apiHeaders(
 /* ---------- state ---------- */
 let S=null;          // loaded dataset
 let tab="advice";
-let apiStatus=null;  // null | "ok" | message
+let apiStatus=null;  // null | "ok" | "blocked" | message
 
 /* ---------- example dataset (shown until a real lookup succeeds) ---------- */
 function exampleData(){
@@ -179,16 +195,26 @@ function exampleData(){
     countries:{"c-ie":{name:"Ireland",tax:12},"c-uk":{name:"United Kingdom",tax:4},"c-fr":{name:"France",tax:9}},
     regions:{"r-lein":{name:"Leinster",country:"c-ie",initialCountry:"c-ie",battle:false},"r-mun":{name:"Munster",country:"c-ie",initialCountry:"c-ie",battle:false},"r-wales":{name:"Wales",country:"c-uk",initialCountry:"c-uk",battle:false}},
     breakRoomCaps:{1:1,2:2,3:3,4:4,5:5},
+    engineDaily:{0:0,1:24,2:48,3:72,4:96,5:120,6:144,7:168},
+    storageMax:{1:500,2:1000,3:1600,4:2400,5:3400,6:4600,7:6000},
     companies:[
-      {id:"co1",name:"Liffey Ironworks",itemCode:"iron",region:"r-lein",breakRoom:3,managerMgmt:0},
-      {id:"co2",name:"Shannon Steel",itemCode:"steel",region:"r-mun",breakRoom:2,managerMgmt:4},
-      {id:"co3",name:"Cardiff Mills",itemCode:"bread",region:"r-wales",breakRoom:2,managerMgmt:0}],
+      {id:"co1",name:"Liffey Ironworks",itemCode:"iron",region:"r-lein",breakRoom:3,engine:2,storage:2,stored:820,managerMgmt:0},
+      {id:"co2",name:"Shannon Steel",itemCode:"steel",region:"r-mun",breakRoom:2,engine:1,storage:1,stored:140,managerMgmt:4},
+      {id:"co3",name:"Cardiff Mills",itemCode:"bread",region:"r-wales",breakRoom:2,engine:0,storage:1,stored:490,managerMgmt:0}],
     employees:{
       co1:[emp("Aoife",4,2,3,62,24,6,0,[],8,0),emp("Ciarán",1,1,2,44,58,3,0,["greedy"],12,0),emp("Niamh",3,4,1,55,31,8,0,["sociable"],5,0)],
-      co2:[emp("Tadhg",2,1,4,51,47,4,0,["loner"],3,8),emp("Saoirse",3,2,2,58,29,9,0,[],10,0)],
-      co3:[emp("Rhys",2,3,1,27,40,5,0,["flight"],2,0)]}};
+      co2:[emp("Tadhg",2,1,4,51,47,4,0,["loner","latebloomer"],3,8),emp("Saoirse",3,2,2,58,29,9,0,[],10,0)],
+      co3:[emp("Rhys",2,3,1,27,40,5,0,["flight"],2,0)]},
+    apiDebug:null};
 }
-function emp(name,prod,luck,resp,happy,age,pot,wage,traits,days,tool){return {id:Math.random().toString(36).slice(2,9),name,prod,luck,resp,happy,age,pot,wage,traits,days,tool,other:0,exp:100}}
+function emp(name,prod,luck,resp,happy,age,pot,wageDay,traits,spec,tool){return {id:Math.random().toString(36).slice(2,9),name,prod,luck,resp,happy,age,pot,wageDay,traits,spec,tool,bonus:null,wageExp:null,other:0,exp:100,from:[]}}
+// Older saves stored an hourly wage and "days on this good".
+function migrate(e){
+  const m=Object.assign({bonus:null,wageExp:null,other:0,exp:100,from:[],tool:0,traits:[]},e);
+  if(m.wageDay==null)m.wageDay=(+m.wage||0)*24;
+  if(m.spec==null)m.spec=+m.days||0;
+  delete m.wage;delete m.days;return m;
+}
 
 /* ---------- live lookup ---------- */
 async function lookup(username){
@@ -212,47 +238,87 @@ async function lookup(username){
     const comps=compIds.length?await apiBatch(compIds.map(id=>["company.getById",{companyId:id}])):[];
     const cfg=cfgR.ok?cfgR.data:{};
     const items={};Object.entries(cfg.items||{}).forEach(([k,v])=>{if(v&&v.productionPoints)items[k]={pp:v.productionPoints,needs:v.productionNeeds||{}}});
-    const caps={};const lv=cfg.upgradesConfig?.breakRoom?.levels||{};Object.entries(lv).forEach(([k,v])=>caps[k]=v?.stats?.maxWorkers??+k);
+    const lvls=(name,pick)=>{const o={};Object.entries(cfg.upgradesConfig?.[name]?.levels||{}).forEach(([k,v])=>o[k]=pick(v,+k));return o};
+    const caps=lvls("breakRoom",(v,k)=>v?.stats?.maxWorkers??k);
+    const engineDaily=Object.assign({0:0},lvls("automatedEngine",v=>v?.stats?.dailyProd??0));
+    const storageMax=lvls("storage",v=>v?.stats?.maxProduction??0);
     const countries={};(ctyR.ok?ctyR.data:[]).forEach(c=>countries[c._id]={name:c.name,tax:c.taxes?.income??0});
     const regions={};Object.values(regR.ok?regR.data:{}).forEach(r=>regions[r._id]={name:r.name,country:r.country,initialCountry:r.initialCountry,battle:!!r.activeBattle,isCapital:r.isCapital});
     const mg=u.skills?.management;const mgmt=typeof mg==="object"?(mg.level??mg.value??0):(+mg||0);
-    const companies=comps.filter(r=>r.ok).map(r=>{const c=r.data;return {id:c._id,name:c.name,itemCode:c.itemCode,region:c.region,breakRoom:c.activeUpgradeLevels?.breakRoom??1,workerCount:c.workerCount,rawWorkers:c.workers,managerMgmt:store.get("mgr."+c._id,0)}});
-    // employees: saved entries first, then anything the API exposes
-    const employees={};let imported=0;
+    const companies=comps.filter(r=>r.ok).map(r=>{const c=r.data,L=c.activeUpgradeLevels||{};return {id:c._id,name:c.name,itemCode:c.itemCode,region:c.region,
+      breakRoom:L.breakRoom??1,engine:L.automatedEngine??0,storage:L.storage??1,stored:+c.production||0,workerCount:c.workerCount,rawWorkers:c.workers,managerMgmt:store.get("mgr."+c._id,0)}});
+    // Employees: anything the API exposes wins field by field; saved manual entries fill the gaps.
     const apiByCompany={};
     if(workR.ok&&Array.isArray(workR.data?.workersPerCompany))workR.data.workersPerCompany.forEach(w=>apiByCompany[w.company?._id]=w.workers);
+    if(workR.ok&&workR.data?.type==="company"&&Array.isArray(workR.data.workers))apiByCompany._single=workR.data.workers;
+    const employees={};let imported=0,rawSample=null;
     companies.forEach(c=>{
-      const saved=store.get("emps."+c.id,null);
-      const fromApi=normalizeEmployees(apiByCompany[c.id]||c.rawWorkers||[]);
-      if(fromApi.length){imported+=fromApi.length;employees[c.id]=mergeEmps(saved||[],fromApi)}
-      else employees[c.id]=saved||[];
+      const raw=apiByCompany[c.id]?.length?apiByCompany[c.id]:(Array.isArray(c.rawWorkers)?c.rawWorkers:[]);
+      if(raw.length&&!rawSample)rawSample=raw[0];
+      const saved=(store.get("emps."+c.id,null)||[]).map(migrate);
+      const fromApi=normalizeEmployees(raw);
+      imported+=fromApi.length;
+      employees[c.id]=fromApi.length?mergeEmps(saved,fromApi):saved;
     });
     S={example:false,player:{id:u._id,username:u.username,country:u.country,mgmt:store.get("mgmt."+u._id,mgmt)},
-      ppValue:ppValue??0,prices:priceR.ok?priceR.data:{},items,countries,regions,breakRoomCaps:caps,companies,employees,imported};
+      ppValue:ppValue??0,prices:priceR.ok?priceR.data:{},items,countries,regions,breakRoomCaps:caps,engineDaily,storageMax,companies,employees,imported,
+      apiDebug:{checkedAt:new Date().toISOString(),workersEndpoint:workR.ok?"answered":("error: "+workR.error),
+        companiesWithWorkerData:companies.filter(c=>(apiByCompany[c.id]?.length||c.rawWorkers?.length)).length,imported,sample:rawSample,
+        sampleCompany:comps.find(r=>r.ok)?.data??null}};
     store.set("lastUser",u.username);apiStatus="ok";render();
   }catch(e){
-    const blocked=e instanceof TypeError;
-    apiStatus=blocked?"blocked":e.message;
+    apiStatus=e instanceof TypeError?"blocked":e.message;
     if(!S)S=exampleData();
     render();
   }
 }
-// Best-effort reader for employee objects, in case the API exposes them.
+
+/* ---------- API field map ----------
+   When the API starts sending employee details, add or fix key names here.
+   Each field lists the paths to try, in order; the first number found wins. */
+const FIELD_MAP={
+  name:{paths:["name","fullName","firstName"],type:"string"},
+  prod:{paths:["production","stats.production","skills.production"]},
+  luck:{paths:["luck","stats.luck","skills.luck"]},
+  resp:{paths:["responsibility","stats.responsibility","skills.responsibility"]},
+  happy:{paths:["happiness","stats.happiness","mood"]},
+  age:{paths:["age","stats.age"]},
+  pot:{paths:["trainingPotential","potential","potentialLeft","stats.trainingPotential"]},
+  wageDay:{paths:["dailyWage","wagePerDay","wage.daily"]},
+  wageHour:{paths:["wage","hourlyWage","wagePerHour","wage.hourly"]},
+  spec:{paths:["specialization","specializationPercent","stats.specialization"]},
+  tool:{paths:["tool.bonus","tool.productionBonus","equippedTool.bonus","toolBonus"]},
+  bonus:{paths:["productionBonus","bonuses.production","stats.productionBonus"]},
+  wageExp:{paths:["wageExpectation","wageModifier","expectation"]},
+};
+function getPath(o,p){return p.split(".").reduce((a,k)=>a==null?a:a[k],o)}
 function normalizeEmployees(list){
   if(!Array.isArray(list))return [];
-  const num=(o,...ks)=>{for(const k of ks){const v=k.split(".").reduce((a,p)=>a?.[p],o);if(typeof v==="number")return v}return null};
   return list.filter(o=>o&&typeof o==="object").map(o=>{
-    const prod=num(o,"production","stats.production","skills.production");
-    if(prod==null)return null;
-    const traits=(o.traits||[]).map(t=>String(typeof t==="string"?t:(t.code||t.name||"")).toLowerCase());
-    const tr=TRAITS.filter(t=>traits.some(x=>x.includes(t.id==="flight"?"flight":t.id))).map(t=>t.id);
-    return {id:o._id||o.id||Math.random().toString(36).slice(2,9),apiId:o._id||o.id,name:o.name||o.firstName||"Employee",prod,
-      luck:num(o,"luck","stats.luck")??1,resp:num(o,"responsibility","stats.responsibility")??1,
-      happy:num(o,"happiness","stats.happiness")??50,age:num(o,"age")??30,pot:num(o,"trainingPotential","potential","stats.potential")??0,
-      wage:num(o,"wage","hourlyWage","salary")??0,traits:tr,days:num(o,"daysOnItem","sameItemDays")??0,tool:num(o,"tool.bonus","toolBonus")??0,other:0,exp:100};
+    const e=emp("Employee",1,1,1,50,30,0,0,[],0,0);const from=[];
+    for(const [f,def] of Object.entries(FIELD_MAP)){
+      for(const p of def.paths){const v=getPath(o,p);
+        if(def.type==="string"?typeof v==="string"&&v:typeof v==="number"){e[f]=v;from.push(f);break}}
+    }
+    if(from.includes("wageHour")&&!from.includes("wageDay")){e.wageDay=e.wageHour*24;from.push("wageDay")}
+    delete e.wageHour;const wi=from.indexOf("wageHour");if(wi>=0)from.splice(wi,1);
+    if(!from.includes("prod"))return null; // not an employee record we understand
+    const traits=(o.traits||[]).map(t=>String(typeof t==="string"?t:(t.code||t.key||t.name||"")).toLowerCase().replace(/[^a-z]/g,""));
+    e.traits=TRAITS.filter(t=>traits.some(x=>x.includes(t.id.replace("flight","flightrisk"))||x===t.id)).map(t=>t.id);
+    if(o.traits)from.push("traits");
+    e.id=o._id||o.id||e.id;e.apiId=o._id||o.id||null;e.from=from;
+    return e;
   }).filter(Boolean);
 }
-function mergeEmps(saved,api){return api.map(a=>{const s=saved.find(x=>x.apiId&&x.apiId===a.apiId);return s?Object.assign({},a,{days:s.days,tool:a.tool||s.tool,other:s.other}):a})}
+function mergeEmps(saved,api){
+  return api.map(a=>{
+    const s=saved.find(x=>x.apiId&&x.apiId===a.apiId)||saved.find(x=>x.name&&x.name.toLowerCase()===a.name.toLowerCase());
+    if(!s)return a;
+    const m=Object.assign({},s,{id:a.id,apiId:a.apiId,from:a.from});
+    a.from.forEach(f=>m[f]=a[f]);
+    return m;
+  });
+}
 
 /* ---------- model ---------- */
 const P=x=>x/100;
@@ -268,40 +334,74 @@ function taxAt(regionId){const r=S.regions[regionId];return r?(S.countries[r.cou
 function cap(c){return S.breakRoomCaps[c.breakRoom]??c.breakRoom}
 function mgmtBonus(c){return Math.min(A.mgmtCap,2*S.player.mgmt)+Math.min(A.mgmtCap,2*(c.managerMgmt||0))}
 function traitPct(e,coworkers){let t=0;if(e.traits.includes("loner")&&coworkers===0)t+=100;if(e.traits.includes("sociable"))t+=25*coworkers;return t+(+e.other||0)}
-// ctx lets hypothetical scenarios override company, coworker count, happiness delta, days, tool
-function evalEmp(e,c,ctx={}){
-  const cw=ctx.coworkers??(S.employees[c.id].length-1);
-  const days=ctx.days??e.days, tool=ctx.tool??e.tool, happy=e.happy+(ctx.dHappy||0);
+const isNum=v=>v!==null&&v!==""&&v!==undefined&&isFinite(+v);
+function hasBonus(e){return isNum(e.bonus)}
+// Responsibility shields a share of every happiness loss (Responsibility 3 cancelled 1.2 of a 4-point tax hit in game).
+function shield(e){return Math.min(1,P(A.shieldPerResp)*(+e.resp||0))}
+function hDelta(e,d){return d<0?d*(1-shield(e)):d}
+// Production bonus % from the parts we can see. ctx overrides parts for "what if" moves.
+function compPct(e,c,ctx={}){
+  const cw=ctx.coworkers??((S.employees[c.id]||[]).length-1);
+  const spec=ctx.spec??e.spec, tool=ctx.tool??e.tool, happy=e.happy+hDelta(e,ctx.dHappy||0);
   const region=ctx.region??c.region;
-  const pct=mgmtBonus(c)+(happy-50)+tool+Math.min(A.maxDaysBonus,days)+(isCore(region)?A.coreBonus:0)+traitPct(e,cw);
+  return mgmtBonus(c)+(happy-50)+tool+Math.min(A.maxSpec,spec)+(isCore(region)?A.coreBonus:0)+traitPct(e,cw);
+}
+function evalEmp(e,c,ctx={}){
+  // If the game's own bonus % was entered, trust it for where they work now and keep the unexplained part in what-ifs.
+  const residual=hasBonus(e)?(+e.bonus-compPct(e,c)):0;
+  const pct=compPct(e,c,ctx)+residual;
   const mult=Math.max(0,1+P(pct));
   const base=e.prod/4;
   const value=vpp(c.itemCode);
-  const gross=base*mult*value;
-  const expMul=wageMul(e);
-  const wage=e.wage>0?e.wage:base*S.ppValue*expMul;
-  return {mult,pct,gross,wage,net:gross-wage,value,base,expMul:e.wage>0&&base*S.ppValue>0?e.wage/(base*S.ppValue):expMul};
+  const ppHr=base*mult;
+  const gross=ppHr*value;
+  // Wage = market rate for their Production x expectation. Daily wage beats the green chip, which beats the trait estimate.
+  const market=base*S.ppValue;
+  const expMul=e.wageDay>0&&market>0?(e.wageDay/24)/market:(isNum(e.wageExp)?1+P(+e.wageExp):wageMul(e));
+  const wage=e.wageDay>0?e.wageDay/24:market*expMul;
+  return {mult,pct,ppHr,gross,wage,net:gross-wage,value,base,residual,expMul};
 }
 function wageMul(e){let m=(e.exp||100)/100;if(e.traits.includes("greedy"))m*=1.2;if(e.traits.includes("modest"))m*=.85;return m}
 function daysLeft(e){return Math.max(0,65-e.age)}
 function allEmps(){const out=[];S.companies.forEach(c=>(S.employees[c.id]||[]).forEach(e=>out.push({e,c,r:evalEmp(e,c)})));return out}
+// Company totals: employees + automated engine, and how long until storage is full.
+function evalCompany(c){
+  const emps=(S.employees[c.id]||[]).map(e=>evalEmp(e,c));
+  const engPPday=S.engineDaily?.[c.engine]??0;
+  const value=vpp(c.itemCode);
+  const empPPhr=emps.reduce((s,r)=>s+r.ppHr,0);
+  const ppHr=empPPhr+engPPday/24;
+  const net=emps.reduce((s,r)=>s+r.net,0)+engPPday/24*value;
+  const max=S.storageMax?.[c.storage]??0;
+  const free=max?Math.max(0,max-(c.stored||0)):null;
+  const hoursToFull=max&&ppHr>0?free/ppHr:null;
+  return {engPPday,engValueDay:engPPday*value,empPPday:empPPhr*24,ppDay:ppHr*24,profitDay:net*24,max,stored:c.stored||0,hoursToFull,value,staffed:emps.length};
+}
 
 /* ---------- recommendations ---------- */
+function recStorage(){
+  const recs=[];
+  S.companies.forEach(c=>{const k=evalCompany(c);if(!k.max)return;
+    if(k.hoursToFull===0)recs.push({lvl:"bad",chip:"Full",c,title:`${c.name} storage is full`,body:`${fmt(k.stored)} of ${fmt(k.max)} PP stored. Full storage lowers employee happiness, so produce or sell now.`});
+    else if(k.hoursToFull!=null&&k.hoursToFull<=A.storageWarnHours)recs.push({lvl:"warn",chip:`${fmt(k.hoursToFull)}h`,c,title:`${c.name} fills in ${dur(k.hoursToFull)}`,body:`Making ${fmt(k.ppDay)} PP/day into ${fmt(k.max)} PP of storage (${fmt(k.stored)} used). Produce before it fills, or raise Storage.`});
+  });
+  return recs;
+}
 function recFire(){
   const recs=[];
   allEmps().forEach(({e,c,r})=>{
     const others=(S.employees[c.id]||[]).filter(x=>x!==e);
-    const fireCost=others.reduce((s,o)=>s+evalEmp(o,c).base*evalEmp(o,c).value*0.05*24,0);
+    const fireCost=others.reduce((s,o)=>{const x=evalEmp(o,c);return s+x.base*x.value*P(-hDelta(o,-5))*24},0);
     const perProd=0.25*(r.mult*r.value-S.ppValue*r.expMul); // net change per +1 Production (wage rises too)
     const dl=daysLeft(e);
     const flight=e.traits.includes("flight"), anchor=e.traits.includes("anchor");
+    const bloom=e.traits.includes("latebloomer")&&e.age<60?` Late Bloomer: gains 2 Production at age ${Math.max(50,Math.ceil((e.age+1)/10)*10)}, ${Math.max(0,Math.max(50,Math.ceil((e.age+1)/10)*10)-e.age)} days away.`:"";
     if(r.net<0){
       const fixable=perProd>0&&e.pot>0&&(r.net+perProd*Math.min(e.pot,dl))>0;
-      const loss7=-r.net*24*7;
       if(fixable)recs.push({lvl:"warn",chip:"Train",who:e,c,title:`${e.name} loses ${fmt(-r.net*24)}/day`,
-        body:`Production cards fix this: each point adds ${fmt(perProd*24)}/day net. ${e.pot} Potential left.`});
+        body:`Production cards fix this: each point adds ${fmt(perProd*24)}/day net. ${e.pot} Potential left.${bloom}`});
       else recs.push({lvl:"bad",chip:"Fire",who:e,c,title:`${e.name} loses ${fmt(-r.net*24)}/day`,
-        body:`${perProd<=0?"Training Production won't help: each point adds more wage than output.":"Not enough Potential or time left to train them into profit."} A week costs ${fmt(loss7)}; firing costs coworkers about ${fmt(fireCost)} in lost output.`});
+        body:`${perProd<=0?"Training Production won't help: each point adds more wage than output.":"Not enough Potential or time left to train them into profit."} A week costs ${fmt(-r.net*24*7)}; firing costs coworkers about ${fmt(fireCost)} in lost output.${bloom}`});
     }else if(dl<=2){
       recs.push({lvl:"warn",chip:"Retiring",who:e,c,title:`${e.name} turns 65 in ${dl} day${dl===1?"":"s"}`,body:`Earning ${fmt(r.net*24)}/day now. Keeping them past 65 gets 5% harder each year, so plan a replacement hire.`});
     }
@@ -320,30 +420,28 @@ function recRelocate(){
       const dstEmps=S.employees[dst.id]||[];
       if(dstEmps.length>=cap(dst))return;
       const same=dst.itemCode===src.itemCode;
-      const nx=evalEmp(e,dst,{coworkers:dstEmps.length,days:same?e.days:0,tool:same?e.tool:0});
-      // knock-on effects on coworkers (Sociable/Loner)
-      let knock=0;
+      const nx=evalEmp(e,dst,{coworkers:dstEmps.length,spec:same?e.spec:0,tool:same?e.tool:0});
+      let knock=0; // Sociable/Loner coworkers on both sides
       srcOthers.forEach(o=>knock+=evalEmp(o,src,{coworkers:srcOthers.length-1}).net-evalEmp(o,src).net);
       dstEmps.forEach(o=>knock+=evalEmp(o,dst,{coworkers:dstEmps.length}).net-evalEmp(o,dst).net);
       const steady=(nx.net-cur.net+knock)*24;
-      const cost=nx.base*nx.value*P(A.moveHappy)*24*A.moveDays;
+      const cost=nx.base*nx.value*P(-hDelta(e,-A.moveHappy))*24*A.moveDays;
       const span=Math.min(H,daysLeft(e));
       const total=steady*span-cost;
       if(steady>0&&total>0)moves.push({lvl:"good",chip:"Move",who:e,c:src,dst,gain:total,
         title:`Move ${e.name} to ${dst.name}`,
-        body:`+${fmt(steady)}/day once settled; ${fmt(total)} gained over ${span} days after the ${A.moveDays}-day unhappiness dip.${!same&&e.days>0?" Resets their days-on-good bonus.":""}${!same&&e.tool>0?" Their tool may not fit the new good.":""}`});
+        body:`+${fmt(steady)}/day once settled; ${fmt(total)} gained over ${span} days after the ${A.moveDays}-day unhappiness dip.${!same?` They start at 0% specialization in ${dst.itemCode}${e.spec>0?`; their ${e.spec}% in ${src.itemCode} is kept for later`:""}.`:""}${!same&&e.tool>0?" Their tool may not fit the new good.":""}`});
     });
   })});
-  // swaps between full companies
   const cos=S.companies;
   for(let i=0;i<cos.length;i++)for(let j=i+1;j<cos.length;j++){
     const A1=cos[i],B1=cos[j];
     (S.employees[A1.id]||[]).forEach(a=>(S.employees[B1.id]||[]).forEach(b=>{
       const sameAB=A1.itemCode===B1.itemCode;
-      const nA=evalEmp(a,B1,{coworkers:(S.employees[B1.id]||[]).length-1,days:sameAB?a.days:0,tool:sameAB?a.tool:0});
-      const nB=evalEmp(b,A1,{coworkers:(S.employees[A1.id]||[]).length-1,days:sameAB?b.days:0,tool:sameAB?b.tool:0});
+      const nA=evalEmp(a,B1,{coworkers:(S.employees[B1.id]||[]).length-1,spec:sameAB?a.spec:0,tool:sameAB?a.tool:0});
+      const nB=evalEmp(b,A1,{coworkers:(S.employees[A1.id]||[]).length-1,spec:sameAB?b.spec:0,tool:sameAB?b.tool:0});
       const steady=(nA.net+nB.net-evalEmp(a,A1).net-evalEmp(b,B1).net)*24;
-      const cost=(nA.base*nA.value+nB.base*nB.value)*P(A.moveHappy)*24*A.moveDays;
+      const cost=(nA.base*nA.value*P(-hDelta(a,-A.moveHappy))+nB.base*nB.value*P(-hDelta(b,-A.moveHappy)))*24*A.moveDays;
       const span=Math.min(H,daysLeft(a),daysLeft(b));
       const total=steady*span-cost;
       if(steady>0&&total>0)moves.push({lvl:"good",chip:"Swap",who:a,who2:b,c:A1,gain:total,
@@ -352,8 +450,11 @@ function recRelocate(){
     }));
   }
   moves.sort((x,y)=>y.gain-x.gain);
-  // keep each employee's best option only
-  const seen=new Set();return moves.filter(m=>{const ks=[m.who.id,m.who2?.id].filter(Boolean);if(ks.some(k=>seen.has(k)))return false;ks.forEach(k=>seen.add(k));return true}).slice(0,8);
+  // one recommendation per employee, and never more moves into a company than it has free slots
+  const seen=new Set(),free={};S.companies.forEach(c=>free[c.id]=cap(c)-(S.employees[c.id]||[]).length);
+  return moves.filter(m=>{const ks=[m.who.id,m.who2?.id].filter(Boolean);if(ks.some(k=>seen.has(k)))return false;
+    if(m.dst){if(free[m.dst.id]<=0)return false;free[m.dst.id]--;free[m.c.id]++}
+    ks.forEach(k=>seen.add(k));return true}).slice(0,8);
 }
 function recTraining(){
   const all=allEmps();
@@ -364,16 +465,17 @@ function recTraining(){
     opts.push({k:"Production",v:0.25*(r.mult*r.value-S.ppValue*r.expMul)*24});
     const luckV=e.luck<20?0.001*P(expToolPct())*(bestGross[c.id]||r.gross)*500*24:0;
     opts.push({k:"Luck",v:luckV});
+    const respV=shield(e)<1?r.gross*P(P(A.shieldPerResp)*taxAt(c.region))*24:0;
+    opts.push({k:"Responsibility",v:respV});
     opts.push({k:"Lower wage",v:r.wage*P(A.wageCardPct)*24,est:true});
-    if(r.wage>0)opts.push({k:"Lower wage (Rare)",v:r.wage*P(A.wageCardPct*3)*24,est:true});
+    if(r.wage>0)opts.push({k:"Lower wage (Rare)",v:r.wage*P(A.wageCardPct*3)*24,est:true,ref:true});
     if(dl>e.pot+3)opts.push({k:"Potential",v:null,note:"more draws"});
-    opts.sort((a,b)=>(b.v??-1)-(a.v??-1));
+    opts.sort((a,b)=>(b.ref?-2:(b.v??-1))-(a.ref?-2:(a.v??-1)));
     const draws=Math.min(e.pot,dl);
-    let lvl="info",chip=`${draws} draw${draws===1?"":"s"} left`;
-    let body;
+    let lvl="info",chip=`${draws} draw${draws===1?"":"s"} left`,body;
     if(draws===0)body=dl===0?"Retiring now. Skip training.":"No Potential left. Only a Potential card from an event can reopen training.";
     else if(opts[0].v<=0)body="No card pays: the wage rises faster than output. Take Lower wage cards if offered.";
-    else body=`Best pick: ${opts[0].k} card, worth +${fmt(opts[0].v)}/day. Responsibility has no output value; take it only to soften bad events.`;
+    else body=`Best pick: ${opts[0].k} card, worth +${fmt(opts[0].v)}/day. Responsibility's figure counts only the tax hit; it also softens move, firing and battle dips.`;
     if(draws>0&&opts[0].k==="Production")lvl="good";
     return {lvl,chip,who:e,c,title:`${e.name} · ${c.name}`,body,opts:draws>0?opts:[]};
   });
@@ -382,33 +484,34 @@ function recCompanyMove(){
   const home=S.player.country;
   return S.companies.map(c=>{
     const emps=S.employees[c.id]||[];
-    const base=emps.reduce((s,e)=>{const r=evalEmp(e,c);return s+r.base*r.value},0); // PP-value per 1.0 multiplier
     const t0=taxAt(c.region), core0=isCore(c.region);
+    // gain per day: core bonus change + tax change (1% tax = 1 happiness, softened by Responsibility)
+    const gainDay=o=>emps.reduce((s,e)=>{const r=evalEmp(e,c);return s+r.base*r.value*P(o.coreD+hDelta(e,o.taxD))},0)*24;
     const options=[];
-    // best home core region (lowest tax is the same home tax; avoid battles)
     const homeCore=Object.entries(S.regions).filter(([,r])=>r.initialCountry===home&&r.country===home);
-    if(homeCore.length){const [rid,r]=homeCore.find(([,r])=>!r.battle)||homeCore[0];
-      const d=(core0?0:A.coreBonus)+(t0-(S.countries[home]?.tax??0));
-      options.push({where:`${r.name} (${S.countries[home]?.name||"home"})`,dPct:d,home:true,battle:r.battle,rid})}
-    // cheapest foreign country
+    if(homeCore.length){const [,r]=homeCore.find(([,r])=>!r.battle)||homeCore[0];
+      options.push({where:`${r.name} (${S.countries[home]?.name||"home"})`,coreD:core0?0:A.coreBonus,taxD:t0-(S.countries[home]?.tax??0),home:true})}
     const foreign=Object.entries(S.countries).filter(([id])=>id!==home).sort((a,b)=>a[1].tax-b[1].tax)[0];
-    if(foreign){const [fid,f]=foreign;const d=(core0?-A.coreBonus:0)+(t0-f.tax);options.push({where:f.name,dPct:d,home:false,tax:f.tax})}
+    if(foreign){const [,f]=foreign;options.push({where:`${f.name} (${f.tax}% tax)`,coreD:core0?-A.coreBonus:0,taxD:t0-f.tax,home:false})}
     const r=S.regions[c.region];
     const cur=`${r?.name||"Unknown region"} (${S.countries[r?.country]?.name||"?"}, ${t0}% tax${core0?", core":""})`;
     if(!emps.length)return {lvl:"info",chip:"No data",c,title:c.name,body:`At ${cur}. Add employees to compare locations.`};
-    const best=options.filter(o=>o.dPct>0).sort((a,b)=>b.dPct-a.dPct)[0];
-    const moveCost=base*P(A.companyMoveHappy)*24*A.moveDays;
-    if(!best||best.where.startsWith(r?.name))return {lvl:"info",chip:"Stay",c,title:c.name,body:`At ${cur}. No location gives your employees more output.${r?.battle?" There is a battle in this region now: −5 happiness and a 1% death risk per employee.":""}`};
-    const perDay=base*P(best.dPct)*24;
-    const net=perDay*A.horizonDays-moveCost;
-    if(net<=0)return {lvl:"info",chip:"Stay",c,title:c.name,body:`At ${cur}. Moving to ${best.where} adds ${fmt(perDay)}/day but the move dip costs ${fmt(moveCost)}, so it doesn't pay within ${A.horizonDays} days.`};
+    options.forEach(o=>o.day=gainDay(o));
+    const best=options.filter(o=>o.day>0&&!(o.home&&core0&&o.taxD===0)).sort((a,b)=>b.day-a.day)[0];
+    const moveCost=emps.reduce((s,e)=>{const x=evalEmp(e,c);return s+x.base*x.value*P(-hDelta(e,-A.companyMoveHappy))},0)*24*A.moveDays;
+    const battle=r?.battle?" There is a battle in this region now: −5 happiness and a 1% death risk per employee.":"";
+    if(!best)return {lvl:"info",chip:"Stay",c,title:c.name,body:`At ${cur}. No location gives your employees more output.${battle}`};
+    const net=best.day*A.horizonDays-moveCost;
+    if(net<=0)return {lvl:"info",chip:"Stay",c,title:c.name,body:`At ${cur}. Moving to ${best.where} adds ${fmt(best.day)}/day but the move dip costs ${fmt(moveCost)}, so it doesn't pay within ${A.horizonDays} days.${battle}`};
+    const why=[best.coreD>0?"Gains the core-region bonus":best.coreD<0?"Loses the core-region bonus":"",best.taxD>0?`tax ${best.taxD} points lower`:best.taxD<0?`tax ${-best.taxD} points higher`:""].filter(Boolean).join(", ");
     return {lvl:best.home?"good":"warn",chip:best.home?"Move home":"Move abroad",c,title:`${c.name} → ${best.where}`,
-      body:`${best.dPct>0?"+":""}${best.dPct}% output (${best.home?"core-region bonus and home tax":"lower tax lifts happiness"}): +${fmt(perDay)}/day, ${fmt(net)} over ${A.horizonDays} days after the move dip.${best.home?"":" You lose the core-region bonus and your wage tax goes to another country."} Everyone has 1 free company move.`};
+      body:`${why}: +${fmt(best.day)}/day, ${fmt(net)} over ${A.horizonDays} days after the move dip.${best.home?"":" Your wage tax would go to another country."} Everyone has 1 free company move.`};
   });
 }
 
 /* ---------- format ---------- */
 function fmt(x){if(!isFinite(x))return"–";const a=Math.abs(x);const d=a>=100?0:a>=10?1:a>=1?2:3;return (x<0?"−":"")+a.toFixed(d)}
+function dur(h){return h>=48?`${fmt(h/24)} days`:`${fmt(h)} h`}
 function esc(s){return String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]))}
 
 /* ---------- render ---------- */
@@ -422,6 +525,7 @@ function render(opt={}){
     :`<div class="notice bad"><strong>The War Era API didn't answer this page.</strong><span>Check your connection and try again. If it keeps failing, the API may not accept requests from browser pages, and the tool needs a small relay server.</span></div>`;
   else if(apiStatus&&apiStatus!=="ok")h+=`<div class="notice bad"><strong>Lookup failed.</strong><span>${esc(apiStatus)}</span></div>`;
   if(S.example)h+=`<div class="notice"><span><span class="chip info">Example data</span> These companies and employees are made up to show how the desk works. Look up a player to load real companies.</span></div>`;
+  else if(S.imported)h+=`<div class="notice"><span><span class="chip good">From the game</span> ${S.imported} employee${S.imported>1?"s":""} loaded from the API. Fields marked GAME update on every lookup.</span></div>`;
   h+=playerBlock();
   if(tab==="advice")h+=adviceView();
   if(tab==="companies")h+=companiesView();
@@ -429,12 +533,12 @@ function render(opt={}){
   app.innerHTML=h;
 }
 function playerBlock(){
-  const all=allEmps();const net=all.reduce((s,x)=>s+x.r.net,0)*24;
+  const net=S.companies.reduce((s,c)=>s+evalCompany(c).profitDay,0);
   const co=S.countries[S.player.country];
   return `<section class="player"><div class="who"><div><div class="label">Player</div><h2>${esc(S.player.username)}</h2></div>
   <div class="small muted">${esc(co?.name||"")}${co?` · ${co.tax}% income tax`:""} · Management ${S.player.mgmt}</div></div>
-  <div class="stats"><div><div class="label">Net / day</div><div class="v ${net>=0?"pos":"neg"}">${fmt(net)}</div></div>
-  <div><div class="label">Employees</div><div class="v">${all.length}</div></div>
+  <div class="stats"><div><div class="label">Profit / day</div><div class="v ${net>=0?"pos":"neg"}">${fmt(net)}</div></div>
+  <div><div class="label">Employees</div><div class="v">${allEmps().length}</div></div>
   <div><div class="label">PP value</div><div class="v">${S.ppValue?S.ppValue.toFixed(4):"–"}</div></div></div></section>`;
 }
 function recHTML(r){
@@ -447,56 +551,79 @@ function section(title,recs,emptyMsg,foot=""){
   <div class="list">${recs.length?recs.map(recHTML).join(""):`<div class="empty">${emptyMsg}</div>`}</div>${foot}</section>`;
 }
 function adviceView(){
+  const storage=recStorage();
   const n=allEmps().length;
-  if(!n)return `<div class="empty">No employees entered yet. The API doesn't share employee stats, so add them from the game in the Companies tab.<br><br><button class="btn primary" data-goto="companies">Add employees</button></div>`;
-  return section("Fire or fix",recFire(),"Every employee earns more than their wage.")
+  let h=storage.length?section("Storage",storage,""):"";
+  if(!n)return h+`<div class="empty">No employees entered yet. The API doesn't share employee stats yet, so add them from the game in the Companies tab.<br><br><button class="btn primary" data-goto="companies">Add employees</button></div>`;
+  return h+section("Fire or fix",recFire(),"Every employee earns more than their wage.")
    +section("Relocate workers",recRelocate(),"No move beats where everyone works now.")
    +section("Training priorities",recTraining(),"",`<p class="small muted">Values are net money per day for one point. Wage rises with Production. *Lower wage cards cut ${A.wageCardPct}% at Common and ${A.wageCardPct}% more per rarity step (Uncommon ${A.wageCardPct*2}%, Rare ${A.wageCardPct*3}%, Epic ${A.wageCardPct*4}%, Legendary ${A.wageCardPct*5}%, Mythic ${A.wageCardPct*6}%), so scale the Common figure when you draw a rarer one.</p>`)
    +section("Company location",recCompanyMove(),"No companies found.");
 }
+const tag=(e,f)=>e.from?.includes(f)?`<span class="src">game</span>`:"";
 function companiesView(){
   if(!S.companies.length)return `<div class="empty">This player has no companies.</div>`;
   return S.companies.map(c=>{
     const emps=S.employees[c.id]||[];const r=S.regions[c.region];
-    const val=vpp(c.itemCode);
+    const k=evalCompany(c);
+    const fill=k.max?Math.min(1,k.stored/k.max):0;
+    const lvl=k.hoursToFull===0?"bad":(k.hoursToFull!=null&&k.hoursToFull<=A.storageWarnHours?"warn":"");
     return `<article class="company"><div class="head"><div class="row"><h3>${esc(c.name)}</h3><span class="good-tag">${esc(c.itemCode)}</span></div>
     <div class="small muted">${esc(r?.name||"Unknown region")}${isCore(c.region)?" · core region":""} · ${taxAt(c.region)}% tax · Break Room ${c.breakRoom} (${emps.length}/${cap(c)})</div>
-    <div class="small muted">1 PP of ${esc(c.itemCode)} is worth <span class="mono">${val.toFixed(4)}</span>${val<S.ppValue?` <span class="chip warn">below wage rate</span>`:""}</div></div>
-    ${emps.map((e,i)=>{const x=evalEmp(e,c);return `<button class="emp" data-edit="${c.id}:${i}"><span class="name">${esc(e.name)}</span><span class="net" style="color:var(${x.net>=0?"--good":"--bad"})">${fmt(x.net*24)}/day</span>
-      <span class="meta">P${e.prod} L${e.luck} R${e.resp} · ${e.happy}☺ · age ${e.age} · pot ${e.pot}${e.traits.length?" · "+e.traits.map(t=>TRAITS.find(x=>x.id===t)?.label).join(", "):""}</span></button>`}).join("")}
+    <div class="small muted">1 PP of ${esc(c.itemCode)} is worth <span class="mono">${k.value.toFixed(4)}</span>${k.value<S.ppValue?` <span class="chip warn">below wage rate</span>`:""}</div></div>
+    <div class="ops">
+      <div class="row"><span>Automated engine ${c.engine?`lvl ${c.engine}`:"none"}</span><span class="mono">${c.engine?`${fmt(k.engPPday)} PP/day · ${fmt(k.engValueDay)}/day`:"–"}</span></div>
+      ${k.max?`<div class="row"><span>Storage lvl ${c.storage}</span><span class="mono">${fmt(k.stored)} / ${fmt(k.max)} PP</span></div>
+      <div class="meter ${lvl}" role="img" aria-label="Storage ${Math.round(fill*100)}% full"><i style="width:${(fill*100).toFixed(1)}%"></i></div>
+      <div class="small muted">${k.hoursToFull===0?"Full now. Produce to free space.":k.hoursToFull!=null?`Making ${fmt(k.ppDay)} PP/day: full in ${dur(k.hoursToFull)}.`:"Nothing producing."}</div>`:`<div class="small muted">Storage level ${c.storage}; capacity not reported.</div>`}
+    </div>
+    ${emps.map((e,i)=>{const x=evalEmp(e,c);return `<button class="emp" data-edit="${c.id}:${i}"><span class="name">${esc(e.name)}${e.from?.length?`<span class="src">game</span>`:""}</span><span class="net" style="color:var(${x.net>=0?"--good":"--bad"})">${fmt(x.net*24)}/day</span>
+      <span class="meta">P${e.prod} R${e.resp} L${e.luck} · ${e.happy}☺ · ${x.pct>=0?"+":""}${x.pct.toFixed(1)}% · ${fmt(x.ppHr*24)} PP/day · age ${e.age} · pot ${e.pot}${e.traits.length?" · "+e.traits.map(t=>TRAITS.find(x=>x.id===t)?.label).join(", "):""}</span></button>`}).join("")}
     ${!emps.length?`<div class="emp"><span class="meta">${c.workerCount?`The game reports ${c.workerCount} employee${c.workerCount>1?"s":""}. Add their stats to analyse them.`:"No employees entered."}</span></div>`:""}
-    <div class="foot"><label class="small muted" for="mgr-${c.id}">Manager Mgmt <input id="mgr-${c.id}" data-mgr="${c.id}" type="number" min="0" max="11" value="${c.managerMgmt||0}" style="width:3.5em;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg)"></label>
-    <button class="btn sm primary" data-add="${c.id}" ${emps.length>=cap(c)?"disabled":""}>Add employee</button></div></article>`;
-  }).join("")+`<p class="small muted">Employee details are saved in this browser only.</p>`;
+    <div class="foot"><span class="small">Profit <b class="mono" style="color:var(${k.profitDay>=0?"--good":"--bad"})">${fmt(k.profitDay)}/day</b></span>
+    <span style="display:flex;gap:8px;align-items:center"><label class="small muted" for="mgr-${c.id}">Manager Mgmt</label><input id="mgr-${c.id}" data-mgr="${c.id}" type="number" min="0" max="11" value="${c.managerMgmt||0}" style="width:3.2em;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg)">
+    <button class="btn sm primary" data-add="${c.id}" ${emps.length>=cap(c)?"disabled":""}>Add</button></span></div></article>`;
+  }).join("")+`<p class="small muted">Profit includes the automated engine. Employee details you type are saved in this browser only.</p>`;
 }
 function settingsView(){
-  const k=store.get("key","");
+  const k=store.get("key","");const d=S.apiDebug;
   return `<section class="block"><div class="block-head"><h2>API key</h2></div>
   <p class="small">Optional. It raises the War Era rate limit. Stored only in this browser and sent only to the War Era API.</p>
-  <div class="field"><input id="apikey" type="password" placeholder="wae_…" value="${esc(k)}" autocomplete="off"></div>
+  <div class="field"><input id="apikey" type="password" placeholder="wae_…" value="${esc(k)}" autocomplete="off" aria-label="API key"></div>
   <div class="actions"><button class="btn primary" data-savekey>Save key</button>${k?`<button class="btn ghost" data-clearkey>Remove key</button>`:""}</div></section>
   <section class="block"><div class="block-head"><h2>Your stats</h2></div>
   <div class="field"><label class="label" for="mgmt">Management points (owner)</label><input id="mgmt" type="number" min="0" max="20" value="${S.player.mgmt}"></div></section>
+  <section class="block"><div class="block-head"><h2>Employee data from the API</h2></div>
+  ${d?`<p class="small">Workers endpoint: <b>${esc(d.workersEndpoint)}</b>. Companies with employee records: <b>${d.companiesWithWorkerData}</b>. Employees understood: <b>${d.imported}</b>.</p>
+  <p class="small muted">When War Era adds employee details to the API, they'll appear here. If employees show up below but not in your companies, copy this and send it to whoever maintains the tool so the field names can be mapped.</p>
+  <pre class="raw" id="rawdump">${esc(JSON.stringify({checkedAt:d.checkedAt,workerSample:d.sample,companySample:d.sampleCompany},null,2))}</pre>
+  <div class="actions"><button class="btn" data-copyraw>Copy API sample</button><span class="small muted" id="copymsg" aria-live="polite"></span></div>`
+  :`<p class="small muted">Look up a player to see what employee data the API returns.</p>`}</section>
   <section class="block"><div class="block-head"><h2>Assumptions</h2></div>
   <p class="small muted">The patch notes leave some numbers out. These are the guesses the advice uses; change them as the community pins them down.</p>
   <div class="grid2">
    ${num("horizonDays","Payback window (days)",A.horizonDays)}${num("wageCardPct","Lower-wage cut at Common %",A.wageCardPct)}
    ${num("moveHappy","Move happiness hit",A.moveHappy)}${num("moveDays","Move hit lasts (days)",A.moveDays)}
-   ${num("companyMoveHappy","Company move happiness hit",A.companyMoveHappy)}${num("coreBonus","Core region bonus %",A.coreBonus)}</div>
+   ${num("companyMoveHappy","Company move happiness hit",A.companyMoveHappy)}${num("coreBonus","Core region bonus %",A.coreBonus)}
+   ${num("maxSpec","Specialization cap %",A.maxSpec)}${num("shieldPerResp","Loss shielded per Responsibility %",A.shieldPerResp)}${num("storageWarnHours","Warn when storage fills within (h)",A.storageWarnHours)}</div>
   <div class="field"><label class="label" for="toolTiers">Tool bonus % by rarity (Common → Mythic)</label><input id="toolTiers" value="${A.toolTiers.join(", ")}"></div>
   <div class="actions"><button class="btn primary" data-saveassume>Save assumptions</button><button class="btn ghost" data-resetassume>Reset</button></div>
-  <details><summary>How the numbers are worked out</summary><div class="formula">output/hr = Production ÷ 4 × multiplier
-multiplier = 1 + Mgmt (2%/pt, max 22%)
-           + manager Mgmt (2%/pt, max 22%)
-           + (happiness − 50)%
-           + tool % + days on good (1%/day, max 20%)
-           + core region ${A.coreBonus}% + trait bonuses
+  <details><summary>How the numbers are worked out</summary><div class="formula">PP/hr      = Production ÷ 4 × (1 + bonus %)
+bonus %    = game's Production bonus, if entered
+             otherwise the sum of:
+             Mgmt 2%/pt (max 22%) + manager 2%/pt (max 22%)
+             + (happiness − 50) + tool % + specialization %
+             + core region ${A.coreBonus}% + trait bonuses
 value/PP   = (price − input costs) ÷ PP per unit
-wage/hr    = Production ÷ 4 × PP value × expectation
-net/hr     = output × value/PP − wage
+wage/day   = game's daily wage, if entered
+             else Production ÷ 4 × 24 × PP value × (1 + wage vs market %)
+profit/day = employees' (output − wage) + engine PP × value/PP
+storage    = hours until full = free PP ÷ (employee + engine PP/hr)
 +1 Luck    = +0.1% toolbox/hr, tool ≈ ${expToolPct().toFixed(1)}% for 500 h
-tax        = −1 happiness per 1% income tax</div>
-  <p class="small muted">Bonuses are added together before multiplying. If the game turns out to multiply them, absolute numbers shift slightly but the rankings hold.</p></details></section>
+tax        = −1 happiness per 1% income tax
+losses     = happiness losses × (1 − ${A.shieldPerResp}% × Responsibility)
+specialization is kept per good; a new good starts at 0%</div>
+  <p class="small muted">When you enter the game's bonus %, the tool works out the part it can't explain (traits it doesn't know, events) and keeps it when it tests moves.</p></details></section>
   ${S.example?"":`<section class="block"><div class="block-head"><h2>Example</h2></div><button class="btn" data-example>Show example data</button></section>`}`;
 }
 function num(id,label,v){return `<div class="field"><label class="label" for="as-${id}">${label}</label><input id="as-${id}" data-as="${id}" type="number" value="${v}"></div>`}
@@ -505,28 +632,36 @@ function num(id,label,v){return `<div class="field"><label class="label" for="as
 const sheetRoot=document.getElementById("sheet-root");
 function openSheet(cid,idx){
   const c=company(cid);const list=S.employees[cid];
-  const e=idx==null?emp("",2,2,2,50,30,5,0,[],0,0):Object.assign({},list[idx],{traits:[...list[idx].traits]});
-  const step=(id,label,v,min,max)=>`<div class="field"><label class="label" for="f-${id}">${label}</label><div class="stepper"><button type="button" data-step="${id}" data-d="-1" aria-label="Decrease ${label}">−</button><input id="f-${id}" type="number" inputmode="numeric" min="${min}" max="${max}" value="${v}"><button type="button" data-step="${id}" data-d="1" aria-label="Increase ${label}">+</button></div></div>`;
+  const e=idx==null?emp("",2,2,2,50,30,4,0,[],0,0):Object.assign({},list[idx],{traits:[...list[idx].traits]});
+  const lock=f=>e.from?.includes(f)?"disabled":"";
+  const step=(id,label,v,min,max,hint="")=>`<div class="field"><label class="label" for="f-${id}">${label}${tag(e,id)}</label><div class="stepper"><button type="button" data-step="${id}" data-d="-1" aria-label="Decrease ${label}" ${lock(id)}>−</button><input id="f-${id}" type="number" inputmode="decimal" min="${min}" max="${max}" step="any" value="${v}" ${lock(id)}><button type="button" data-step="${id}" data-d="1" aria-label="Increase ${label}" ${lock(id)}>+</button></div>${hint?`<span class="hint">${hint}</span>`:""}</div>`;
   sheetRoot.innerHTML=`<div class="sheet-bg" data-close></div><div class="sheet" role="dialog" aria-label="Employee"><form class="wrap" id="empform">
    <div class="brand"><h2>${idx==null?"New employee":"Edit employee"}</h2><span class="small muted">${esc(c.name)}</span></div>
-   <div class="field"><label class="label" for="f-name">Name</label><input id="f-name" value="${esc(e.name)}" placeholder="As shown in game" required></div>
-   <div class="grid2">${step("prod","Production",e.prod,1,40)}${step("luck","Luck",e.luck,1,40)}${step("resp","Responsibility",e.resp,1,40)}${step("pot","Potential left",e.pot,0,30)}
-   ${step("happy","Happiness",e.happy,0,100)}${step("age","Age",e.age,18,99)}${step("days","Days on this good",e.days,0,99)}${step("tool","Tool bonus %",e.tool,0,65)}</div>
-   <div class="grid2"><div class="field"><label class="label" for="f-wage">Wage per hour</label><input id="f-wage" type="number" step="0.0001" min="0" value="${e.wage||""}" placeholder="From the game"></div>
-   <div class="field"><label class="label" for="f-other">Other trait bonus %</label><input id="f-other" type="number" value="${e.other||0}"></div></div>
-   <div class="field"><span class="label">Traits</span><div class="traits">${TRAITS.map(t=>`<label title="${t.note}"><input type="checkbox" name="trait" value="${t.id}" ${e.traits.includes(t.id)?"checked":""}>${t.label}</label>`).join("")}</div>
-   <span class="small muted">Leave the wage blank to estimate it at 100% expectation.</span></div>
+   ${e.from?.length?`<p class="small muted">Fields marked GAME come from the API and update on every lookup.</p>`:`<p class="small muted">Copy these from the employee page in the game.</p>`}
+   <div class="field"><label class="label" for="f-name">Name${tag(e,"name")}</label><input id="f-name" value="${esc(e.name)}" placeholder="As shown in game" required ${lock("name")}></div>
+   <div class="grid2">${step("prod","Production",e.prod,1,40,"Pickaxe icon")}${step("resp","Responsibility",e.resp,1,40,"Tie icon")}
+   ${step("luck","Luck",e.luck,1,40,"Clover icon")}${step("pot","Potential left",e.pot,0,30,"Brain icon, draws left")}
+   ${step("happy","Happiness",e.happy,0,100,"Tooltip total, e.g. 47.2")}${step("age","Age",e.age,18,99)}
+   ${step("spec","Specialization %",e.spec,0,A.maxSpec,"From the Specialization section; +1% per day on this good")}${step("tool","Tool bonus %",e.tool,0,65)}</div>
+   <div class="grid2">
+   <div class="field"><label class="label" for="f-bonus">Production bonus %${tag(e,"bonus")}</label><input id="f-bonus" type="number" inputmode="decimal" step="any" value="${hasBonus(e)?e.bonus:""}" placeholder="e.g. 14.2" ${lock("bonus")}><span class="hint">Orange pickaxe chip. Optional, makes output exact.</span></div>
+   <div class="field"><label class="label" for="f-wageDay">Daily wage${tag(e,"wageDay")}</label><input id="f-wageDay" type="number" inputmode="decimal" step="any" min="0" value="${e.wageDay||""}" placeholder="e.g. 1.74" ${lock("wageDay")}><span class="hint">Optional. Fixed at today's market rate.</span></div></div>
+   <div class="field"><label class="label" for="f-wageExp">Wage vs market %${tag(e,"wageExp")}</label><input id="f-wageExp" type="number" inputmode="decimal" step="any" value="${isNum(e.wageExp)?e.wageExp:""}" placeholder="e.g. -4.4" ${lock("wageExp")}><span class="hint">Green coin chip. Used when daily wage is blank, and follows the market rate as it moves.</span></div>
+   <div class="field"><span class="label">Traits${tag(e,"traits")}</span><div class="traits">${TRAITS.map(t=>`<label title="${esc(t.note)}"><input type="checkbox" name="trait" value="${t.id}" ${e.traits.includes(t.id)?"checked":""} ${lock("traits")}>${t.label}</label>`).join("")}</div>
+   <span class="hint">Other traits aren't scored yet. If you entered the game's bonus %, their effect on output is already counted.</span></div>
+   <details><summary class="small">Unlisted trait bonus</summary><div class="field" style="margin-top:8px"><label class="label" for="f-other">Extra production %</label><input id="f-other" type="number" inputmode="decimal" step="any" value="${e.other||0}"><span class="hint">Only needed if you left the bonus % blank.</span></div></details>
    <div class="actions">${idx!=null?`<button type="button" class="btn ghost" data-del style="color:var(--bad)">Remove</button>`:"<span></span>"}<span style="display:flex;gap:8px"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary" type="submit">Save</button></span></div>
   </form></div>`;
   const f=document.getElementById("empform");
   f.addEventListener("submit",ev=>{ev.preventDefault();
     const g=id=>+document.getElementById("f-"+id).value||0;
-    const n={...e,name:document.getElementById("f-name").value.trim()||"Employee",prod:g("prod"),luck:g("luck"),resp:g("resp"),pot:g("pot"),happy:g("happy"),age:g("age"),days:g("days"),tool:g("tool"),wage:g("wage"),other:g("other"),
-      traits:[...f.querySelectorAll("input[name=trait]:checked")].map(x=>x.value)};
+    const bRaw=document.getElementById("f-bonus").value.trim(),xRaw=document.getElementById("f-wageExp").value.trim();
+    const n={...e,name:document.getElementById("f-name").value.trim()||"Employee",prod:g("prod"),luck:g("luck"),resp:g("resp"),pot:g("pot"),happy:g("happy"),age:g("age"),spec:g("spec"),tool:g("tool"),wageDay:g("wageDay"),other:g("other"),
+      bonus:bRaw===""?null:+bRaw,wageExp:xRaw===""?null:+xRaw,traits:[...f.querySelectorAll("input[name=trait]:checked")].map(x=>x.value)};
     if(idx==null)list.push(n);else list[idx]=n;
     saveEmps(cid);closeSheet();render();});
   f.querySelector("[data-del]")?.addEventListener("click",()=>{list.splice(idx,1);saveEmps(cid);closeSheet();render()});
-  document.getElementById("f-name").focus({preventScroll:true});
+  if(idx==null)document.getElementById("f-name").focus({preventScroll:true});
 }
 function closeSheet(){sheetRoot.innerHTML=""}
 function saveEmps(cid){if(!S.example)store.set("emps."+cid,S.employees[cid])}
@@ -547,6 +682,9 @@ app.addEventListener("click",e=>{
   if(t.closest("[data-savekey]")){store.set("key",document.getElementById("apikey").value.trim());render();return}
   if(t.closest("[data-clearkey]")){store.set("key","");render();return}
   if(t.closest("[data-example]")){S=exampleData();apiStatus=null;tab="advice";render();return}
+  if(t.closest("[data-copyraw]")){const pre=document.getElementById("rawdump"),msg=document.getElementById("copymsg");
+    const sel=()=>{const r=document.createRange();r.selectNodeContents(pre);const s=getSelection();s.removeAllRanges();s.addRange(r);msg.textContent="Selected. Use your phone's Copy."};
+    try{navigator.clipboard.writeText(pre.textContent).then(()=>msg.textContent="Copied.",sel)}catch{sel()}return}
   if(t.closest("[data-saveassume]")){
     document.querySelectorAll("[data-as]").forEach(i=>A[i.dataset.as]=+i.value);
     const tt=document.getElementById("toolTiers").value.split(/[,\s]+/).map(Number).filter(n=>!isNaN(n));if(tt.length===6)A.toolTiers=tt;
