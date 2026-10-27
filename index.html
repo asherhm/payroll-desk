@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: one phone-width column; sticky lookup bar, tabbed desk (Advice / Companies / Settings), bottom sheet for employee entry */
+/* Layout: one phone-width column; sticky lookup bar, tabbed desk (Recommendations with sub-views / one company at a time / Settings), bottom sheet for employee entry */
 :root{
   --bg:#EDF0EB; --surface:#F8FAF6; --ink:#18211C; --muted:#5B6A61; --line:#D3DACF;
   --accent:#1E6A4C; --accent-ink:#F4FAF6; --accent-soft:#D6E8DE;
@@ -49,7 +49,7 @@ form.lookup input{flex:1;min-width:0;padding:10px 12px;border:1px solid var(--li
 .btn.ghost{background:transparent}
 .btn.sm{padding:5px 10px;font-size:.85rem}
 .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--bg);border-radius:var(--r);padding:3px}
-.tabs button{border:0;background:transparent;border-radius:8px;padding:7px 4px;font-weight:600;color:var(--muted)}
+.tabs button{border:0;background:transparent;border-radius:8px;padding:7px 4px;font-weight:600;font-size:.88rem;color:var(--muted)}
 .tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 
 main .wrap{padding-block:16px 48px;display:grid;gap:20px}
@@ -94,6 +94,33 @@ section.block{display:grid;gap:10px}
 .emp .meta{grid-column:1/-1;font-size:.8rem;color:var(--muted)}
 .emp .net{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
 .company .foot{padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.seg{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.seg::-webkit-scrollbar{display:none}
+.seg button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;font-weight:600;font-size:.85rem;color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+.seg button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg .n{font-family:var(--f-mono);font-size:.7rem;background:var(--bad-soft);color:var(--bad);border-radius:99px;padding:0 6px}
+.cosel{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}
+.cosel select{min-width:0;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);font-weight:600}
+.chead{display:grid;grid-template-columns:52px 1fr;gap:12px;padding:12px;border-bottom:1px solid var(--line)}
+.tile{width:52px;height:52px;border-radius:10px;background:var(--accent-soft);color:var(--good);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:1.3rem}
+.hmain{display:grid;gap:3px;min-width:0}
+.hmain .row,.store .row,.more .row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.facts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.8rem;color:var(--muted);font-family:var(--f-mono)}
+.emp2{display:grid;gap:4px;padding:10px 12px;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;width:100%}
+.emp2 .l1{display:flex;gap:8px;align-items:baseline;min-width:0}
+.emp2 .name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.emp2 .net{margin-left:auto;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.emp2 .l2,.emp2 .l3{display:flex;flex-wrap:wrap;gap:4px}
+.st{font-family:var(--f-mono);font-size:.78rem;background:var(--bg);border-radius:5px;padding:1px 6px}
+.st.bonus{background:var(--warn-soft);color:var(--warn)}
+.tr{font-size:.72rem;font-weight:600;border-radius:99px;padding:1px 8px;background:var(--accent-soft);color:var(--good)}
+.tr.neg{background:var(--bad-soft);color:var(--bad)}
+.store{padding:10px 12px;display:grid;gap:6px;border-bottom:1px solid var(--line)}
+.more{padding:10px 12px;display:grid;gap:8px;font-size:.85rem}
+.mini{width:4em;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.segset{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--bg);border-radius:var(--r);padding:3px}
+.segset button{border:0;background:transparent;border-radius:8px;padding:8px 4px;font-weight:600;color:var(--muted)}
+.segset button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .src{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--good);border:1px solid var(--accent-soft);border-radius:4px;padding:0 4px;margin-left:4px;vertical-align:1px}
 
 .sheet-bg{position:fixed;inset:0;background:rgba(10,16,12,.45);z-index:20}
@@ -128,7 +155,7 @@ pre.raw{font-family:var(--f-mono);font-size:.72rem;background:var(--bg);border-r
   <div class="brand"><h1>Payroll Desk</h1><span class="ver">WarEra v0.27</span></div>
   <form class="lookup" id="lookup"><input id="username" placeholder="Player username" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Player username"><button class="btn primary" type="submit">Look up</button></form>
   <div class="tabs" role="tablist">
-    <button role="tab" id="tab-advice" aria-selected="true" data-tab="advice">Advice</button>
+    <button role="tab" id="tab-advice" aria-selected="true" data-tab="advice">Recommendations</button>
     <button role="tab" id="tab-companies" aria-selected="false" data-tab="companies">Companies</button>
     <button role="tab" id="tab-settings" aria-selected="false" data-tab="settings">Settings</button>
   </div>
@@ -144,7 +171,7 @@ const store={get(k,d){try{const v=localStorage.getItem("wpd."+k);return v==null?
   set(k,v){try{localStorage.setItem("wpd."+k,JSON.stringify(v))}catch{}}};
 
 /* ---------- assumptions (editable in Settings) ---------- */
-const DEFAULT_ASSUME={horizonDays:14,toolTiers:[3,8,15,25,40,65],wageCardPct:5,moveHappy:10,moveDays:7,companyMoveHappy:10,coreBonus:5,maxSpec:20,mgmtCap:22,storageWarnHours:24,shieldPerResp:10};
+const DEFAULT_ASSUME={horizonDays:14,toolTiers:[3,8,15,25,40,65],wageCardPct:5,moveHappy:10,moveDays:7,companyMoveHappy:10,coreBonus:5,maxSpec:20,mgmtCap:22,storageWarnHours:24,shieldPerResp:10,valueAt:"market"};
 let A=Object.assign({},DEFAULT_ASSUME,store.get("assume",{}));
 const TOOLBOX_ODDS=[.35,.37,.20,.065,.013,.002];
 const expToolPct=()=>TOOLBOX_ODDS.reduce((s,p,i)=>s+p*A.toolTiers[i],0);
@@ -156,8 +183,13 @@ const TRAITS=[
   {id:"modest",label:"Modest",note:"asks 15% less pay"},
   {id:"latebloomer",label:"Late Bloomer",note:"+2 Production per 10 years past 40"},
   {id:"luckycharm",label:"Lucky Charm",note:"coworkers get Luck 3"},
+  {id:"taxshy",label:"Tax-shy",note:"−1% production per 1% tax, down to −30%"},
   {id:"flight",label:"Flight risk",note:"starts looking to quit at 50 happiness"},
   {id:"anchor",label:"Anchor",note:"never quits"}];
+
+// In-game product names where they differ from the API codes; others are split from camelCase.
+const ITEM_NAMES={cocain:"Pill",coca:"Mysterious Plant"};
+function itemName(code){if(!code)return"";return ITEM_NAMES[code]||String(code).replace(/([a-z])([A-Z0-9])/g,"$1 $2").replace(/^./,c=>c.toUpperCase())}
 
 /* ---------- API ---------- */
 const API="https://api2.warera.io/trpc/";
@@ -183,6 +215,8 @@ async function apiVoid(proc){const res=await fetch(API+proc,{headers:apiHeaders(
 /* ---------- state ---------- */
 let S=null;          // loaded dataset
 let tab="advice";
+let sub=store.get("sub","fire");   // Recommendations sub-view
+let selCo=store.get("selco",null); // company shown in Companies
 let apiStatus=null;  // null | "ok" | "blocked" | message
 
 /* ---------- example dataset (shown until a real lookup succeeds) ---------- */
@@ -323,6 +357,7 @@ function mergeEmps(saved,api){
 /* ---------- model ---------- */
 const P=x=>x/100;
 function vpp(item){ // money value of one production point in this good, net of inputs
+  if(A.valueAt==="pp")return S.ppValue; // the game's own profit figures use this rate
   const it=S.items[item];const price=S.prices[item];
   if(!it||price==null)return S.ppValue;
   let inputs=0;for(const [k,q] of Object.entries(it.needs||{}))inputs+=q*(S.prices[k]??0);
@@ -344,7 +379,8 @@ function compPct(e,c,ctx={}){
   const cw=ctx.coworkers??((S.employees[c.id]||[]).length-1);
   const spec=ctx.spec??e.spec, tool=ctx.tool??e.tool, happy=e.happy+hDelta(e,ctx.dHappy||0);
   const region=ctx.region??c.region;
-  return mgmtBonus(c)+(happy-50)+tool+Math.min(A.maxSpec,spec)+(isCore(region)?A.coreBonus:0)+traitPct(e,cw);
+  const taxShy=e.traits.includes("taxshy")?Math.min(30,taxAt(region)):0; // not shielded by Responsibility
+  return mgmtBonus(c)+(happy-50)+tool+Math.min(A.maxSpec,spec)+(isCore(region)?A.coreBonus:0)+traitPct(e,cw)-taxShy;
 }
 function evalEmp(e,c,ctx={}){
   // If the game's own bonus % was entered, trust it for where they work now and keep the unexplained part in what-ifs.
@@ -420,7 +456,7 @@ function recRelocate(){
       const dstEmps=S.employees[dst.id]||[];
       if(dstEmps.length>=cap(dst))return;
       const same=dst.itemCode===src.itemCode;
-      const nx=evalEmp(e,dst,{coworkers:dstEmps.length,spec:same?e.spec:0,tool:same?e.tool:0});
+      const nx=evalEmp(e,dst,{coworkers:dstEmps.length,spec:same?e.spec:0,tool:same?e.tool:0,dHappy:taxAt(src.region)-taxAt(dst.region)});
       let knock=0; // Sociable/Loner coworkers on both sides
       srcOthers.forEach(o=>knock+=evalEmp(o,src,{coworkers:srcOthers.length-1}).net-evalEmp(o,src).net);
       dstEmps.forEach(o=>knock+=evalEmp(o,dst,{coworkers:dstEmps.length}).net-evalEmp(o,dst).net);
@@ -430,7 +466,7 @@ function recRelocate(){
       const total=steady*span-cost;
       if(steady>0&&total>0)moves.push({lvl:"good",chip:"Move",who:e,c:src,dst,gain:total,
         title:`Move ${e.name} to ${dst.name}`,
-        body:`+${fmt(steady)}/day once settled; ${fmt(total)} gained over ${span} days after the ${A.moveDays}-day unhappiness dip.${!same?` They start at 0% specialization in ${dst.itemCode}${e.spec>0?`; their ${e.spec}% in ${src.itemCode} is kept for later`:""}.`:""}${!same&&e.tool>0?" Their tool may not fit the new good.":""}`});
+        body:`+${fmt(steady)}/day once settled; ${fmt(total)} gained over ${span} days after the ${A.moveDays}-day unhappiness dip.${!same?` They start at 0% specialization in ${itemName(dst.itemCode)}${e.spec>0?`; their ${e.spec}% in ${itemName(src.itemCode)} is kept for later`:""}.`:""}${!same&&e.tool>0?" Their tool may not fit the new good.":""}`});
     });
   })});
   const cos=S.companies;
@@ -438,8 +474,8 @@ function recRelocate(){
     const A1=cos[i],B1=cos[j];
     (S.employees[A1.id]||[]).forEach(a=>(S.employees[B1.id]||[]).forEach(b=>{
       const sameAB=A1.itemCode===B1.itemCode;
-      const nA=evalEmp(a,B1,{coworkers:(S.employees[B1.id]||[]).length-1,spec:sameAB?a.spec:0,tool:sameAB?a.tool:0});
-      const nB=evalEmp(b,A1,{coworkers:(S.employees[A1.id]||[]).length-1,spec:sameAB?b.spec:0,tool:sameAB?b.tool:0});
+      const nA=evalEmp(a,B1,{coworkers:(S.employees[B1.id]||[]).length-1,spec:sameAB?a.spec:0,tool:sameAB?a.tool:0,dHappy:taxAt(A1.region)-taxAt(B1.region)});
+      const nB=evalEmp(b,A1,{coworkers:(S.employees[A1.id]||[]).length-1,spec:sameAB?b.spec:0,tool:sameAB?b.tool:0,dHappy:taxAt(B1.region)-taxAt(A1.region)});
       const steady=(nA.net+nB.net-evalEmp(a,A1).net-evalEmp(b,B1).net)*24;
       const cost=(nA.base*nA.value*P(-hDelta(a,-A.moveHappy))+nB.base*nB.value*P(-hDelta(b,-A.moveHappy)))*24*A.moveDays;
       const span=Math.min(H,daysLeft(a),daysLeft(b));
@@ -486,13 +522,13 @@ function recCompanyMove(){
     const emps=S.employees[c.id]||[];
     const t0=taxAt(c.region), core0=isCore(c.region);
     // gain per day: core bonus change + tax change (1% tax = 1 happiness, softened by Responsibility)
-    const gainDay=o=>emps.reduce((s,e)=>{const r=evalEmp(e,c);return s+r.base*r.value*P(o.coreD+hDelta(e,o.taxD))},0)*24;
+    const gainDay=o=>emps.reduce((s,e)=>{const r=evalEmp(e,c);return s+r.base*r.value*P(o.coreD+hDelta(e,o.taxD)+(e.traits.includes("taxshy")?Math.min(30,t0)-Math.min(30,o.newTax):0))},0)*24;
     const options=[];
     const homeCore=Object.entries(S.regions).filter(([,r])=>r.initialCountry===home&&r.country===home);
     if(homeCore.length){const [,r]=homeCore.find(([,r])=>!r.battle)||homeCore[0];
-      options.push({where:`${r.name} (${S.countries[home]?.name||"home"})`,coreD:core0?0:A.coreBonus,taxD:t0-(S.countries[home]?.tax??0),home:true})}
+      options.push({where:`${r.name} (${S.countries[home]?.name||"home"})`,coreD:core0?0:A.coreBonus,taxD:t0-(S.countries[home]?.tax??0),newTax:S.countries[home]?.tax??0,home:true})}
     const foreign=Object.entries(S.countries).filter(([id])=>id!==home).sort((a,b)=>a[1].tax-b[1].tax)[0];
-    if(foreign){const [,f]=foreign;options.push({where:`${f.name} (${f.tax}% tax)`,coreD:core0?-A.coreBonus:0,taxD:t0-f.tax,home:false})}
+    if(foreign){const [,f]=foreign;options.push({where:`${f.name} (${f.tax}% tax)`,coreD:core0?-A.coreBonus:0,taxD:t0-f.tax,newTax:f.tax,home:false})}
     const r=S.regions[c.region];
     const cur=`${r?.name||"Unknown region"} (${S.countries[r?.country]?.name||"?"}, ${t0}% tax${core0?", core":""})`;
     if(!emps.length)return {lvl:"info",chip:"No data",c,title:c.name,body:`At ${cur}. Add employees to compare locations.`};
@@ -550,40 +586,59 @@ function section(title,recs,emptyMsg,foot=""){
   return `<section class="block"><div class="block-head"><h2>${title}</h2><span class="count">${recs.length}</span></div>
   <div class="list">${recs.length?recs.map(recHTML).join(""):`<div class="empty">${emptyMsg}</div>`}</div>${foot}</section>`;
 }
+const SUBS=[["fire","Fire or fix"],["relocate","Relocate"],["training","Training"],["location","Location"],["storage","Storage"]];
 function adviceView(){
-  const storage=recStorage();
   const n=allEmps().length;
-  let h=storage.length?section("Storage",storage,""):"";
-  if(!n)return h+`<div class="empty">No employees entered yet. The API doesn't share employee stats yet, so add them from the game in the Companies tab.<br><br><button class="btn primary" data-goto="companies">Add employees</button></div>`;
-  return h+section("Fire or fix",recFire(),"Every employee earns more than their wage.")
-   +section("Relocate workers",recRelocate(),"No move beats where everyone works now.")
-   +section("Training priorities",recTraining(),"",`<p class="small muted">Values are net money per day for one point. Wage rises with Production. *Lower wage cards cut ${A.wageCardPct}% at Common and ${A.wageCardPct}% more per rarity step (Uncommon ${A.wageCardPct*2}%, Rare ${A.wageCardPct*3}%, Epic ${A.wageCardPct*4}%, Legendary ${A.wageCardPct*5}%, Mythic ${A.wageCardPct*6}%), so scale the Common figure when you draw a rarer one.</p>`)
-   +section("Company location",recCompanyMove(),"No companies found.");
+  const lists={fire:n?recFire():[],relocate:n?recRelocate():[],training:n?recTraining():[],location:recCompanyMove(),storage:recStorage()};
+  const flag=k=>k==="training"?0:lists[k].filter(r=>r.lvl!=="info").length;
+  if(!SUBS.some(([k])=>k===sub))sub="fire";
+  const h=`<div class="seg" role="tablist" aria-label="Recommendation type">${SUBS.map(([k,l])=>`<button type="button" role="tab" data-sub="${k}" aria-selected="${k===sub}">${l}${flag(k)?`<span class="n">${flag(k)}</span>`:""}</button>`).join("")}</div>`;
+  if(!n&&["fire","relocate","training"].includes(sub))return h+`<div class="empty">No employees entered yet. The API doesn't share employee stats yet, so add them from the game in the Companies tab.<br><br><button class="btn primary" data-goto="companies">Add employees</button></div>`;
+  const T={fire:["Fire or fix","Every employee earns more than their wage."],relocate:["Relocate workers","No move beats where everyone works now."],
+    training:["Training priorities","No employees to train."],location:["Company location","No companies found."],storage:["Storage",`No storage fills within ${A.storageWarnHours} hours.`]};
+  const foot=sub==="training"?`<p class="small muted">Values are net money per day for one point. Wage rises with Production. *Lower wage cards cut ${A.wageCardPct}% at Common and ${A.wageCardPct}% more per rarity step (Uncommon ${A.wageCardPct*2}%, Rare ${A.wageCardPct*3}%, Epic ${A.wageCardPct*4}%, Legendary ${A.wageCardPct*5}%, Mythic ${A.wageCardPct*6}%), so scale the Common figure when you draw a rarer one.</p>`:"";
+  return h+section(T[sub][0],lists[sub],T[sub][1],foot);
 }
 const tag=(e,f)=>e.from?.includes(f)?`<span class="src">game</span>`:"";
+const signed=x=>(x>=0?"+":"")+fmt(x);
+function initials(name){return name.split(/\s+/).map(w=>w[0]).join("").slice(0,2).toUpperCase()}
 function companiesView(){
   if(!S.companies.length)return `<div class="empty">This player has no companies.</div>`;
-  return S.companies.map(c=>{
-    const emps=S.employees[c.id]||[];const r=S.regions[c.region];
-    const k=evalCompany(c);
-    const fill=k.max?Math.min(1,k.stored/k.max):0;
-    const lvl=k.hoursToFull===0?"bad":(k.hoursToFull!=null&&k.hoursToFull<=A.storageWarnHours?"warn":"");
-    return `<article class="company"><div class="head"><div class="row"><h3>${esc(c.name)}</h3><span class="good-tag">${esc(c.itemCode)}</span></div>
-    <div class="small muted">${esc(r?.name||"Unknown region")}${isCore(c.region)?" · core region":""} · ${taxAt(c.region)}% tax · Break Room ${c.breakRoom} (${emps.length}/${cap(c)})</div>
-    <div class="small muted">1 PP of ${esc(c.itemCode)} is worth <span class="mono">${k.value.toFixed(4)}</span>${k.value<S.ppValue?` <span class="chip warn">below wage rate</span>`:""}</div></div>
-    <div class="ops">
-      <div class="row"><span>Automated engine ${c.engine?`lvl ${c.engine}`:"none"}</span><span class="mono">${c.engine?`${fmt(k.engPPday)} PP/day · ${fmt(k.engValueDay)}/day`:"–"}</span></div>
-      ${k.max?`<div class="row"><span>Storage lvl ${c.storage}</span><span class="mono">${fmt(k.stored)} / ${fmt(k.max)} PP</span></div>
-      <div class="meter ${lvl}" role="img" aria-label="Storage ${Math.round(fill*100)}% full"><i style="width:${(fill*100).toFixed(1)}%"></i></div>
-      <div class="small muted">${k.hoursToFull===0?"Full now. Produce to free space.":k.hoursToFull!=null?`Making ${fmt(k.ppDay)} PP/day: full in ${dur(k.hoursToFull)}.`:"Nothing producing."}</div>`:`<div class="small muted">Storage level ${c.storage}; capacity not reported.</div>`}
-    </div>
-    ${emps.map((e,i)=>{const x=evalEmp(e,c);return `<button class="emp" data-edit="${c.id}:${i}"><span class="name">${esc(e.name)}${e.from?.length?`<span class="src">game</span>`:""}</span><span class="net" style="color:var(${x.net>=0?"--good":"--bad"})">${fmt(x.net*24)}/day</span>
-      <span class="meta">P${e.prod} R${e.resp} L${e.luck} · ${e.happy}☺ · ${x.pct>=0?"+":""}${x.pct.toFixed(1)}% · ${fmt(x.ppHr*24)} PP/day · age ${e.age} · pot ${e.pot}${e.traits.length?" · "+e.traits.map(t=>TRAITS.find(x=>x.id===t)?.label).join(", "):""}</span></button>`}).join("")}
-    ${!emps.length?`<div class="emp"><span class="meta">${c.workerCount?`The game reports ${c.workerCount} employee${c.workerCount>1?"s":""}. Add their stats to analyse them.`:"No employees entered."}</span></div>`:""}
-    <div class="foot"><span class="small">Profit <b class="mono" style="color:var(${k.profitDay>=0?"--good":"--bad"})">${fmt(k.profitDay)}/day</b></span>
-    <span style="display:flex;gap:8px;align-items:center"><label class="small muted" for="mgr-${c.id}">Manager Mgmt</label><input id="mgr-${c.id}" data-mgr="${c.id}" type="number" min="0" max="11" value="${c.managerMgmt||0}" style="width:3.2em;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg)">
-    <button class="btn sm primary" data-add="${c.id}" ${emps.length>=cap(c)?"disabled":""}>Add</button></span></div></article>`;
-  }).join("")+`<p class="small muted">Profit includes the automated engine. Employee details you type are saved in this browser only.</p>`;
+  const c=company(selCo)||S.companies[0];selCo=c.id;
+  const i=S.companies.indexOf(c);
+  const opts=S.companies.map(x=>{const k=evalCompany(x);return `<option value="${x.id}" ${x===c?"selected":""}>${esc(x.name)} · ${esc(itemName(x.itemCode))} · ${signed(k.profitDay)}/day</option>`}).join("");
+  return `<div class="cosel"><button type="button" class="btn sm" data-conav="-1" aria-label="Previous company" ${i===0?"disabled":""}>‹</button>
+    <select id="cosel" aria-label="Company">${opts}</select>
+    <button type="button" class="btn sm" data-conav="1" aria-label="Next company" ${i===S.companies.length-1?"disabled":""}>›</button></div>`
+    +companyCard(c)+`<p class="small muted">Company ${i+1} of ${S.companies.length}. Employee details you type are saved in this browser only.</p>`;
+}
+function companyCard(c){
+  const emps=S.employees[c.id]||[];const r=S.regions[c.region];const cty=S.countries[r?.country];
+  const k=evalCompany(c);const good=itemName(c.itemCode);
+  const fill=k.max?Math.min(1,k.stored/k.max):0;
+  const lvl=k.hoursToFull===0?"bad":(k.hoursToFull!=null&&k.hoursToFull<=A.storageWarnHours?"warn":"");
+  const empNet=k.profitDay-k.engValueDay;
+  return `<article class="company">
+  <div class="chead"><div class="tile" title="${esc(good)}">${esc(initials(good))}</div>
+    <div class="hmain"><div class="row"><h3>${esc(c.name)}</h3><span class="mono" style="color:var(${k.profitDay>=0?"--good":"--bad"})">${signed(k.profitDay)}/day</span></div>
+    <div class="small">${esc(r?.name||"Unknown region")}${cty?` · ${esc(cty.name)}`:""}${isCore(c.region)?` <span class="chip good">core</span>`:""}</div>
+    <div class="facts"><span>${taxAt(c.region)}% tax</span><span>Engine ${c.engine||0}</span><span>Break room ${c.breakRoom} · ${emps.length}/${cap(c)}</span><span>Storage ${c.storage}</span></div></div></div>
+  ${emps.map((e,j)=>{const x=evalEmp(e,c);return `<button class="emp2" data-edit="${c.id}:${j}">
+    <span class="l1"><span class="name">${esc(e.name)}${e.from?.length?`<span class="src">game</span>`:""}</span><span class="muted small">${e.age}</span><span class="net" style="color:var(${x.net>=0?"--good":"--bad"})">${signed(x.net*24)}</span></span>
+    <span class="l2"><span class="st">P ${e.prod}</span><span class="st">R ${e.resp}</span><span class="st">L ${e.luck}</span><span class="st">☺ ${e.happy}</span><span class="st bonus">${x.pct>=0?"+":""}${x.pct.toFixed(1)}%</span><span class="st">Pot ${e.pot}</span></span>
+    ${e.traits.length?`<span class="l3">${e.traits.map(t=>`<span class="tr ${t==="taxshy"||t==="greedy"||t==="flight"?"neg":""}">${esc(TRAITS.find(y=>y.id===t)?.label||t)}</span>`).join("")}</span>`:""}</button>`}).join("")}
+  ${!emps.length?`<div class="emp2"><span class="small muted">${c.workerCount?`The game reports ${c.workerCount} employee${c.workerCount>1?"s":""}. Add their stats to analyse them.`:"No employees entered."}</span></div>`:""}
+  <div class="store">${k.max?`<div class="row"><span class="mono">${fmt(k.stored)} / ${fmt(k.max)} PP</span><span class="small muted">+${fmt(k.ppDay)} PP/day</span></div>
+    <div class="meter ${lvl}" role="img" aria-label="Storage ${Math.round(fill*100)}% full"><i style="width:${(fill*100).toFixed(1)}%"></i></div>
+    <div class="small muted">${k.hoursToFull===0?"Full now. Produce to free space.":k.hoursToFull!=null?`Full in ${dur(k.hoursToFull)}.`:"Nothing producing."}</div>`
+    :`<div class="small muted">Storage level ${c.storage}; capacity not reported.</div>`}</div>
+  <div class="more">
+    <div class="row"><span>Employees</span><span class="mono">${fmt(k.empPPday)} PP · ${signed(empNet)}/day</span></div>
+    <div class="row"><span>Automated engine${c.engine?` lvl ${c.engine}`:""}</span><span class="mono">${c.engine?`${fmt(k.engPPday)} PP · +${fmt(k.engValueDay)}/day`:"none"}</span></div>
+    <div class="row"><span>1 PP of ${esc(good)} (${A.valueAt==="pp"?"game rate":"market"})</span><span class="mono">${k.value.toFixed(4)}${A.valueAt!=="pp"&&k.value<S.ppValue?` <span class="chip warn">below wage rate</span>`:""}</span></div>
+    <div class="row"><label for="mgr-${c.id}">Manager Management</label><input id="mgr-${c.id}" data-mgr="${c.id}" type="number" min="0" max="11" value="${c.managerMgmt||0}" class="mini"></div>
+    <button class="btn primary" data-add="${c.id}" ${emps.length>=cap(c)?"disabled":""}>${emps.length>=cap(c)?"Break room full":"Add employee"}</button>
+  </div></article>`;
 }
 function settingsView(){
   const k=store.get("key","");const d=S.apiDebug;
@@ -591,6 +646,9 @@ function settingsView(){
   <p class="small">Optional. It raises the War Era rate limit. Stored only in this browser and sent only to the War Era API.</p>
   <div class="field"><input id="apikey" type="password" placeholder="wae_…" value="${esc(k)}" autocomplete="off" aria-label="API key"></div>
   <div class="actions"><button class="btn primary" data-savekey>Save key</button>${k?`<button class="btn ghost" data-clearkey>Remove key</button>`:""}</div></section>
+  <section class="block"><div class="block-head"><h2>Value output at</h2></div>
+  <div class="segset" role="group" aria-label="Value output at"><button type="button" data-valueat="market" aria-pressed="${A.valueAt!=="pp"}">Market price</button><button type="button" data-valueat="pp" aria-pressed="${A.valueAt==="pp"}">Game's PP rate</button></div>
+  <p class="small muted">Market price is what your goods actually sell for, net of inputs. The game's own profit figures value every good at the PP rate (${S.ppValue?S.ppValue.toFixed(4):"–"}), so pick that to match the employee screen.</p></section>
   <section class="block"><div class="block-head"><h2>Your stats</h2></div>
   <div class="field"><label class="label" for="mgmt">Management points (owner)</label><input id="mgmt" type="number" min="0" max="20" value="${S.player.mgmt}"></div></section>
   <section class="block"><div class="block-head"><h2>Employee data from the API</h2></div>
@@ -679,6 +737,9 @@ app.addEventListener("click",e=>{
   const ed=t.closest("[data-edit]");if(ed){const [c,i]=ed.dataset.edit.split(":");openSheet(c,+i);return}
   const ad=t.closest("[data-add]");if(ad){openSheet(ad.dataset.add,null);return}
   const go=t.closest("[data-goto]");if(go){tab=go.dataset.goto;render();return}
+  const sb=t.closest("[data-sub]");if(sb){sub=sb.dataset.sub;store.set("sub",sub);render();return}
+  const cn=t.closest("[data-conav]");if(cn){const i=S.companies.findIndex(c=>c.id===selCo)+(+cn.dataset.conav);if(S.companies[i]){selCo=S.companies[i].id;store.set("selco",selCo);render()}return}
+  const va=t.closest("[data-valueat]");if(va){A.valueAt=va.dataset.valueat;store.set("assume",A);render();return}
   if(t.closest("[data-savekey]")){store.set("key",document.getElementById("apikey").value.trim());render();return}
   if(t.closest("[data-clearkey]")){store.set("key","");render();return}
   if(t.closest("[data-example]")){S=exampleData();apiStatus=null;tab="advice";render();return}
@@ -694,6 +755,7 @@ app.addEventListener("click",e=>{
 });
 app.addEventListener("change",e=>{
   const m=e.target.closest("[data-mgr]");if(m){const c=company(m.dataset.mgr);c.managerMgmt=Math.max(0,+m.value||0);if(!S.example)store.set("mgr."+c.id,c.managerMgmt);render()}
+  if(e.target.id==="cosel"){selCo=e.target.value;store.set("selco",selCo);render();return}
   if(e.target.id==="mgmt"){const v=+e.target.value;if(!isNaN(v)){S.player.mgmt=v;if(!S.example)store.set("mgmt."+S.player.id,v)}}
 });
 
